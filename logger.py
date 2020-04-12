@@ -4,8 +4,9 @@ import datetime, glob, serial, sys
 def readit(ser, f):
     try:
         r = ser.readline().rstrip().decode('ascii')
-        if len(r) > 0:
-            print(f'"{datetime.datetime.now()}" {r}', file=f)
+        if r:
+            now = datetime.datetime.now().isoformat(timespec='microseconds')
+            print(f'{now} {r}', file=f)
             f.flush()
     except serial.serialutil.SerialException:
         print("fail", ser.port, file=sys.stderr)
