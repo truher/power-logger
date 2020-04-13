@@ -65,6 +65,34 @@ def serial_reader():
                 print("top level exception",
                       sys.exc_info()[0], file=sys.stderr)
 
+def parse(line):
+    try:
+        result = {}
+        fields = line.split()
+        if len(fields) != 4:
+            raise ValueError(f'wrong field count: {line}')
+
+        time_str = fields[0]
+        result['time'] = datetime.fromisoformat(time_str)
+
+        id_str = fields[1]
+        if len(id_str) != 18:
+            raise ValueError(f'wrong id length: {id_str}')
+        result['id'] = id_str
+
+        ct_str = fields[2]
+        if len(ct_str) != 3:
+            raise ValueError(f'wrong ct length: {ct_str}')
+        result['ct'] = ct_str
+
+        measure_str = fields[3]
+        result['measure'] = float(measure_str)
+        return result
+
+    except ValueError:
+        traceback.print_exc(file=sys.stderr)
+        print(f'ignore broken line: {line}', file=sys.stderr)
+
 def file_reader():
     print("file_reader", file=sys.stderr)
     with open('data.csv', 'r') as fin:
@@ -72,30 +100,15 @@ def file_reader():
         inotify.add_watch('data.csv', flags.MODIFY)
         while True:
             line = fin.readline().rstrip()
-            if line:
-                try:
-                    fields = line.split()
-                    if len(fields) != 4:
-                        print(f'wrong field count: {line}', file=sys.stderr)
-                        continue
-                    time_str = fields[0]
-                    parsed_time = datetime.fromisoformat(time_str)
-                    id = fields[1]
-                    if len(id) != 18:
-                        print(f'wrong id length: {line}', file=sys.stderr)
-                        continue
-                    ct = fields[2]
-                    if len(ct) != 3:
-                        print(f'wrong ct length: {line}', file=sys.stderr)
-                        continue
-                    measure = fields[3]
-                    parsed_measure = float(measure)
-                    print(f'{time_str} {id} {ct} {measure}')
-                except ValueError:
-                    print(f'ignore broken line: {line}', file=sys.stderr)
-            else:
-                # wait for modify event
+            if not line:
+                # EOF, wait for next modify event
                 inotify.read()
+                continue
+            result = parse(line)
+            if result is None:
+                continue
+            print(result)
+            #print(f'{time_str} {id} {ct} {measure}')
 
 def main():
     print("main", file=sys.stderr)
