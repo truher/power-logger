@@ -1,7 +1,6 @@
 import io
 import numpy as np
 import pandas as pd
-#import random
 import scipy.integrate as it
 import webbrowser
 
@@ -9,6 +8,8 @@ from flask import Flask, Response, request
 from matplotlib.backends.backend_svg import FigureCanvasSVG
 from matplotlib.figure import Figure
 from waitress import serve
+
+import lib
 
 app = Flask(__name__)
 ids = [ "5737333034370D0E14", "5737333034370A220D" ]
@@ -20,26 +21,11 @@ def read_file():
     raw_data = raw_data.set_index(['time'])
     return raw_data
 
-def random_data():
-    num_rows = 1000000
-
-    time_ideal = pd.date_range(end=pd.Timestamp.now(), periods=num_rows, freq='10S')
-    time_deltas  = pd.to_timedelta(np.random.uniform(-1, 1, num_rows),unit='S')
-    time_actual = time_ideal + time_deltas
-
-    #data  = np.random.uniform(0, 1, num_rows)
-    # lognormal(0,1) has mean exp(0.5) or about 1.65
-    data  = np.random.lognormal(0, 1, num_rows)
-
-    df = pd.DataFrame(data={'time': time_actual, 'measure': data})
-    df = df.set_index(['time'])
-    return df
-
 @app.route("/")
 def index():
 
     #raw_data = read_file()
-    raw_data = random_data()
+    raw_data = lib.random_data()
     print("got raw_data")
     print(raw_data.tail())
 
