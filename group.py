@@ -3,26 +3,38 @@ import matplotlib.pyplot as plt
 
 # experimenting with group-by
 
+ids = {"5737333034370D0E14":
+          {'ct1':'load1',
+           'ct2':'load2',
+           'ct3':'load3',
+           'ct4':'load4'},
+       "5737333034370A220D":
+          {'ct1':'load5',
+           'ct2':'load6',
+           'ct3':'load7',
+           'ct4':'load8'}
+        }
+def load_name(row):
+    return ids[row['id']][row['dim']]
 
-df = pd.read_csv("dd.0", delim_whitespace=True)
+df = pd.read_csv("data.csv", delim_whitespace=True, header=0,
+                 index_col=0, names=['time','id','dim','measure'],
+                 parse_dates=True)
+print("raw data")
 print(df)
-df['time']=pd.to_datetime(df['time'])
+
+df['load'] = df.apply(load_name, axis=1)
+print("with load")
 print(df)
-print(df['measure'])
-print(df.columns)
-df['hr']=df['time'].dt.floor('10T')
-df['k']=df['id'].map(str)+df['dim'].map(str)
-print(df)
-#plt.figure()
-#jdf.groupby(['hr','id','dim'])['measure'].sum().unstack().plot()
-a = df.groupby(['hr','k'])['measure'].mean()
-print(a)
-b = a.unstack()
+
+b = df.pivot(columns='load', values='measure')
+print("b")
 print(b)
-b.plot()
-#g = df.groupby(['id','dim','hr'])['measure'].sum()
-#g = df.groupby(['hr'])['measure'].sum()
-#print(g)
+b.plot(style='o')
 
-#g.plot(x='hr', y='measure')
+c = b.interpolate(method='time')
+print("c")
+print(c)
+c.plot()
+
 plt.show()
