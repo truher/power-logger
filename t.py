@@ -16,9 +16,7 @@ ids = [ "5737333034370D0E14", "5737333034370A220D" ]
 
 def read_file():
     # Read the raw file (watts)
-    raw_data = pd.read_csv('dt.0', delim_whitespace=True, comment='#')
-    raw_data['time'] = pd.to_datetime(raw_data['time'])
-    raw_data = raw_data.set_index(['time'])
+    raw_data = lib.read_raw('dt.0') # show test data
     return raw_data
 
 @app.route("/")

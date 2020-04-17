@@ -10,8 +10,6 @@ raw_data = pd.read_csv('dt.0',
                        comment='#',
                        index_col=0,
                        parse_dates=True)
-#raw_data['time'] = pd.to_datetime(raw_data['time'])
-#raw_data = raw_data.set_index(['time'])
 print("raw data")
 print(raw_data)
 #print(raw_data.index)
@@ -53,11 +51,6 @@ print(yrt)
 yrx = pd.DataFrame(yrt, index=yri.index, columns=['measure'])
 print("yri cumulative integral frame")
 print(yrx)
-
-
-#print("hi 5")
-#z = raw_data.resample(rule='D').max().interpolate().sum()
-#print(z)
 
 
 # Bucket boundaries we want, with some left padding
