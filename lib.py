@@ -3,32 +3,51 @@ import numpy as np
 import pandas as pd
 from scipy import integrate
 
-# return (time, measure)
-def random_data():
-    num_rows = 1000000
-
+def jitter_time(num_rows):
     time_ideal = pd.date_range(end=pd.Timestamp.now(), periods=num_rows,
                                freq='10S')
     time_deltas  = pd.to_timedelta(np.random.uniform(-1, 1, num_rows),
                                    unit='S')
     time_actual = time_ideal + time_deltas
+    return time_actual
+
+# return (time, measure)
+def random_data():
+    num_rows = 1000000
+    time_actual = jitter_time(num_rows)
 
     #data  = np.random.uniform(0.99, 1.01, num_rows)
     # lognormal(0,1) has mean exp(0.5) or about 1.65
-    data  = np.random.lognormal(0, 1, num_rows)
+    measure = np.random.lognormal(0, 1, num_rows)
 
-    df = pd.DataFrame(data={'time': time_actual, 'measure': data})
-    df = df.set_index(['time'])
+    df = pd.DataFrame(data={'measure': measure}, index=time_actual)
+    #df = pd.DataFrame(data={'time': time_actual, 'measure': data})
+    #df = df.set_index(['time'])
+    return df
+
+# return (time, id, ct, measure)
+def multi_random_data():
+    ids = ['5737333034370A220D', '5737333034370D0E14']
+    cts = ['ct1', 'ct2', 'ct3', 'ct4']
+
+    num_rows = 1000000
+    time_actual = jitter_time(num_rows)
+    ct = [*map(lambda x: cts[x], np.random.randint(0,4, num_rows))]
+    id = [*map(lambda x: ids[x], np.random.randint(0,2, num_rows))]
+    measure = np.random.lognormal(0, 1, num_rows)
+
+    df = pd.DataFrame(data={'id':id, 'ct':ct, 'measure':measure},
+                      index=time_actual)
     return df
 
 def read_raw(filename):
     raw_data = pd.read_csv(filename, delim_whitespace=True, comment='#',
-                               index_col=0, parse_dates=True)
+                           index_col=0, parse_dates=True)
     return raw_data
 
 def make_hourly(raw_data):
-    # provide a zero just before the first point, so integration sees the first
-    # point but nothing before it
+    # provide a zero just before the first point, so integration sees
+    # the first point but nothing before it
     raw_data = pd.concat(
         [pd.DataFrame(
             index=[raw_data.index.min() - pd.DateOffset(seconds=1)],
