@@ -58,7 +58,7 @@ def index():
     fig.set_tight_layout(True) # Make sure the titles don't overlap
 
     raw_data = lib.random_data()
-    #raw_data = lib.read_raw('data_test.csv') # show test data
+    #raw_data = lib.read_raw('test_data.csv') # show test data
     print(raw_data)
     plot_raw_data(raw_data, fig)
     hourly = lib.make_hourly(raw_data)

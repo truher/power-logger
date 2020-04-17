@@ -10,7 +10,7 @@ class TestRandom(unittest.TestCase):
         self.assertEqual(1000000, len(x), 'size must be 1e6')
 
     def test_rollup(self):
-        raw_data = lib.read_raw('data_test.csv')
+        raw_data = lib.read_raw('test_data.csv')
         print(raw_data)
         self.assertEqual(3, len(raw_data), 'three observations')
         hourly = lib.make_hourly(raw_data)

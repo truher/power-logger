@@ -7,8 +7,10 @@ from scipy import integrate
 def random_data():
     num_rows = 1000000
 
-    time_ideal = pd.date_range(end=pd.Timestamp.now(), periods=num_rows, freq='10S')
-    time_deltas  = pd.to_timedelta(np.random.uniform(-1, 1, num_rows),unit='S')
+    time_ideal = pd.date_range(end=pd.Timestamp.now(), periods=num_rows,
+                               freq='10S')
+    time_deltas  = pd.to_timedelta(np.random.uniform(-1, 1, num_rows),
+                                   unit='S')
     time_actual = time_ideal + time_deltas
 
     #data  = np.random.uniform(0.99, 1.01, num_rows)
@@ -28,27 +30,38 @@ def make_hourly(raw_data):
     # provide a zero just before the first point, so integration sees the first
     # point but nothing before it
     raw_data = pd.concat(
-        [pd.DataFrame(index=[raw_data.index.min() - pd.DateOffset(seconds=1)],
-                      data=[0], columns=['measure']), raw_data])
+        [pd.DataFrame(
+            index=[raw_data.index.min() - pd.DateOffset(seconds=1)],
+            data=[0], columns=['measure']), raw_data])
 
-    # Bucket boundaries we want, with some left padding to be sure we can set the first to zero
-    buckets = pd.DataFrame(pd.date_range(start=raw_data.index.min().floor('H') - pd.DateOffset(hours=1),
-                  end=raw_data.index.max().ceil('H'), freq='H')).set_index(0)
+    # Bucket boundaries we want, with some left padding to be sure we
+    # can set the first to zero
+    buckets = pd.DataFrame(
+        pd.date_range(
+            start=raw_data.index.min().floor('H') - pd.DateOffset(hours=1),
+            end=raw_data.index.max().ceil('H'), freq='H')).set_index(0)
 
-    # Insert bucket boundaries into the raw dataset (they'll have NaN measures)
+    # Insert bucket boundaries into the raw dataset (they'll have NaN
+    # measures)
     raw_data_with_buckets = raw_data.append(buckets).sort_index()
 
     # Set the left edge to zero
     raw_data_with_buckets.at[raw_data_with_buckets.index.min()]=0
 
     # Fill interpolated values at the bucket boundaries
-    interpolated = raw_data_with_buckets.interpolate(method='time', limit_area='inside').dropna()
+    interpolated = raw_data_with_buckets.interpolate(method='time',
+        limit_area='inside').dropna()
 
     # Integrate the data series to get cumulative energy (kWh)
-    cum_kwh = pd.DataFrame(index=interpolated.index, columns=['measure'],
-                  data=integrate.cumtrapz(interpolated['measure'],
-                                   x=interpolated.index, initial=0) / (1000 * np.timedelta64(1, 'h')))
+    cum_kwh = pd.DataFrame(
+        index=interpolated.index, columns=['measure'],
+        data=integrate.cumtrapz(
+            interpolated['measure'],
+            x=interpolated.index, initial=0)
+        / (1000 * np.timedelta64(1, 'h')))
 
-    # Downsample to the buckets, diff to get energy per bucket, trim the leading zero
-    hourly = cum_kwh.resample(rule='H',closed='right',label='right',loffset='-1H').max().diff().dropna().iloc[1:]
+    # Downsample to the buckets, diff to get energy per bucket, trim
+    # the leading zero
+    hourly = cum_kwh.resample(rule='H',closed='right',label='right',
+        loffset='-1H').max().diff().dropna().iloc[1:]
     return hourly
