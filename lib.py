@@ -3,6 +3,20 @@ import numpy as np
 import pandas as pd
 from scipy import integrate
 
+loads = {"5737333034370D0E14":
+          {'ct1':'load1',
+           'ct2':'load2',
+           'ct3':'load3',
+           'ct4':'load4'},
+       "5737333034370A220D":
+          {'ct1':'load5',
+           'ct2':'load6',
+           'ct3':'load7',
+           'ct4':'load8'}
+        }
+def load_name(row):
+    return loads[row['id']][row['ct']]
+
 def jitter_time(num_rows):
     time_ideal = pd.date_range(end=pd.Timestamp.now(), periods=num_rows,
                                freq='10S')
@@ -27,8 +41,11 @@ def random_data():
 
 # return (time, id, ct, measure)
 def multi_random_data():
-    ids = ['5737333034370A220D', '5737333034370D0E14']
-    cts = ['ct1', 'ct2', 'ct3', 'ct4']
+    ids = list(loads.keys())
+    #ids = ['5737333034370A220D', '5737333034370D0E14']
+    cts = list(set(np.array(list(
+        map(lambda x: list(x.keys()), loads.values()))).flat)) 
+    #cts = ['ct1', 'ct2', 'ct3', 'ct4']
 
     num_rows = 1000000
     time_actual = jitter_time(num_rows)
@@ -44,6 +61,23 @@ def read_raw(filename):
     raw_data = pd.read_csv(filename, delim_whitespace=True, comment='#',
                            index_col=0, parse_dates=True)
     return raw_data
+
+# treat each load separately, then merge at the end
+def make_multi_hourly(raw_data):
+    pd.set_option('display.max_rows', None)
+    raw_data['load'] = raw_data.copy().apply(load_name, axis=1)
+    hourly = pd.DataFrame(columns=['measure'])
+    for load in list(set(raw_data['load'])):
+        hourly = hourly.append(
+            make_hourly(raw_data[raw_data['load']==load][['measure']])
+            .assign(load=load))
+    group = hourly.groupby(level=0).sum()
+    #print("group")
+    #print(group)
+    hourly = hourly.append(group.assign(load='total'))
+    #print("hourly")
+    #print(hourly)
+    return hourly
 
 def make_hourly(raw_data):
     # provide a zero just before the first point, so integration sees
