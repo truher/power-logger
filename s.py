@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 #import scipy.integrate as it
 
-from flask import Flask, Response, request
+from flask import Flask, Response, request, render_template_string
 from matplotlib.backends.backend_svg import FigureCanvasSVG
 from matplotlib.figure import Figure
 from waitress import serve
@@ -133,7 +133,14 @@ def index():
     # Give the SVG to the browser
     output = io.BytesIO()
     FigureCanvasSVG(fig).print_svg(output)
-    return Response(output.getvalue(), mimetype="image/svg+xml")
+    #return Response(output.getvalue(), mimetype="image/svg+xml")
+    monthly_total = (hourly[hourly['load']=='total'][['measure']]
+                     .resample(rule='MS').sum())
+    return render_template_string(f"""
+        {output.getvalue().decode("utf-8")}
+        <p>kWh/mo</p>
+        {monthly_total.to_html(header=False)}
+    """)
     
 def main():
     # Waitress is the recommended flask runner
