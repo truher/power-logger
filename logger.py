@@ -4,17 +4,7 @@ from datetime import datetime
 from glob import glob
 from inotify_simple import INotify, flags
 
-def transcribe(sink):
-    def f(source):
-        try:
-            line = source.readline().rstrip().decode('ascii')
-            if line:
-                now = datetime.now().isoformat(timespec='microseconds')
-                print(f'{now} {line}', file=sink, flush=True)
-        except serial.serialutil.SerialException:
-            print("fail", source.port, file=sys.stderr)
-            source.close()
-    return f
+import lib
 
 def new_serial(port):
     print(f'new {port}', file=sys.stderr, flush=True)
@@ -47,7 +37,7 @@ def transcribe_all(serials, sink):
     ttys = glob("/dev/ttyACM*")
     serials = [*filter(lambda x: is_open(x) and has_tty(ttys)(x), serials)]
     serials.extend([*map(new_serial, filter(no_serial(serials), ttys))])
-    [*map(transcribe(sink), serials)]
+    [*map(lib.transcribe(sink), serials)]
     return serials
 
 def serial_reader():

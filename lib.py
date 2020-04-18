@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import serial
+from datetime import datetime
 from scipy import integrate
 
 loadsdf = pd.DataFrame(data={
@@ -50,6 +52,12 @@ def multi_random_data():
                       index=time_actual)
     df.set_index(df.index.rename('time'), inplace=True)
     return df
+
+# return (time, id, ct, measure)
+def read_raw_no_header(filename):
+    return pd.read_csv(filename, delim_whitespace=True, comment='#',
+                       index_col=0, parse_dates=True, header=0,
+                       names=['time','id','ct','measure'])
 
 def read_raw(filename):
     return pd.read_csv(filename, delim_whitespace=True, comment='#',
@@ -115,3 +123,15 @@ def make_hourly(raw_data):
     hourly = cum_kwh.resample(rule='H',closed='right',label='right',
         loffset='-1H').max().diff().dropna().iloc[1:]
     return hourly
+
+def transcribe(sink):
+    def f(source):
+        try:
+            line = source.readline().rstrip().decode('ascii')
+            if line:
+                now = datetime.now().isoformat(timespec='microseconds')
+                print(f'{now} {line}', file=sink, flush=True)
+        except serial.serialutil.SerialException:
+            print("fail", source.port, file=sys.stderr)
+            source.close()
+    return f

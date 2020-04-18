@@ -1,12 +1,43 @@
+import io
 import lib
 import unittest
 
 # show how to do a unittest of a naked function
 
 class TestRandom(unittest.TestCase):
-    #def test_load_name(self):
-        #x = lib.load_name({'id':'5737333034370D0E14','ct':'ct4'})
-        #self.assertEqual('load4', x)
+    def test_transcribe(self):
+        sink = io.StringIO()
+        source = io.BytesIO(b"asdf\n")
+        f = lib.transcribe(sink)
+        f(source)
+        content = sink.getvalue()
+        self.assertEqual("asdf\n", content[-5:])
+
+    def test_io_write_str(self):
+        output = io.StringIO()
+        output.write('hi')
+        content = output.getvalue()
+        output.close()
+        self.assertEqual("hi", content)
+
+    def test_io_write(self):
+        output = io.BytesIO()
+        output.write(b'hi')
+        content = output.getvalue().decode('ascii')
+        output.close()
+        self.assertEqual("hi", content)
+
+    def test_io_read_str(self):
+        buf = io.StringIO('hello\nthere\n')
+        self.assertEqual("hello\n", buf.readline())
+        self.assertEqual("there\n", buf.readline())
+        self.assertFalse(buf.readline())
+
+    def test_io_read(self):
+        buf = io.BytesIO(b'hello\nthere\n')
+        self.assertEqual("hello\n", buf.readline().decode('ascii'))
+        self.assertEqual("there\n", buf.readline().decode('ascii'))
+        self.assertFalse(buf.readline())
 
     def test_jitter_time(self):
         x = lib.jitter_time(10)
@@ -22,9 +53,14 @@ class TestRandom(unittest.TestCase):
 
     def test_read_raw(self):
         raw_data = lib.read_raw('test_data.csv')
-        self.assertEqual(3, len(raw_data), 'three observations')
+        self.assertEqual(3, len(raw_data))
+        self.assertCountEqual(['measure'], list(raw_data.columns))
         raw_data = lib.read_raw('test_data_multi.csv')
-        self.assertEqual(24, len(raw_data), 'three observations')
+        self.assertEqual(24, len(raw_data))
+        self.assertCountEqual(['id','ct','measure'], list(raw_data.columns))
+        raw_data = lib.read_raw_no_header('test_data_long.csv')
+        self.assertEqual(24112, len(raw_data))
+        self.assertCountEqual(['id','ct','measure'], list(raw_data.columns))
 
     def test_resolve_name(self):
         raw_data = lib.read_raw('test_data_multi.csv')

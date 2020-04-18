@@ -1,6 +1,7 @@
 import io #, webbrowser
 import numpy as np
 import pandas as pd
+import threading
 #import scipy.integrate as it
 
 from flask import Flask, Response, request, render_template_string
@@ -119,7 +120,8 @@ def index():
     fig = Figure(figsize=(10,15))
     fig.set_tight_layout(True) # Make sure the titles don't overlap
 
-    raw_data = lib.multi_random_data()
+    raw_data = lib.read_raw_no_header('test_data_long.csv')
+    #raw_data = lib.multi_random_data()
     #raw_data = lib.random_data()
     #raw_data = lib.read_raw('test_data.csv') # show test data
     load_data = lib.resolve_name(raw_data)
@@ -141,8 +143,17 @@ def index():
         <p>kWh/mo</p>
         {monthly_total.to_html(header=False)}
     """)
-    
+
+# write data to the raw data file 
+def data_reader():
+    pass
+
+# notice when the raw data file is updated and update the summary file
+def summarizer():
+    pass
+
 def main():
+    threading.Thread(target=summarizer).start()
     # Waitress is the recommended flask runner
     serve(app, host="0.0.0.0", port=5000)
 
