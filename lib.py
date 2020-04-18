@@ -1,21 +1,16 @@
-# common libs
 import numpy as np
 import pandas as pd
 from scipy import integrate
 
-loads = {"5737333034370D0E14":
-          {'ct1':'load1',
-           'ct2':'load2',
-           'ct3':'load3',
-           'ct4':'load4'},
-       "5737333034370A220D":
-          {'ct1':'load5',
-           'ct2':'load6',
-           'ct3':'load7',
-           'ct4':'load8'}
-        }
-def load_name(row):
-    return loads[row['id']][row['ct']]
+loadsdf = pd.DataFrame(data={
+          'id':["5737333034370D0E14", "5737333034370D0E14",
+                "5737333034370D0E14", "5737333034370D0E14",
+                "5737333034370A220D", "5737333034370A220D",
+                "5737333034370A220D", "5737333034370A220D"],
+          'ct':['ct1', 'ct2', 'ct3', 'ct4',
+                'ct1', 'ct2', 'ct3', 'ct4'],
+          'load':['load1', 'load2', 'load3', 'load4',
+                  'load5', 'load6', 'load7', 'load8']})
 
 def jitter_time(num_rows):
     time_ideal = pd.date_range(end=pd.Timestamp.now(), periods=num_rows,
@@ -35,17 +30,15 @@ def random_data():
     measure = np.random.lognormal(0, 1, num_rows)
 
     df = pd.DataFrame(data={'measure': measure}, index=time_actual)
+    df.set_index(df.index.rename('time'), inplace=True)
     #df = pd.DataFrame(data={'time': time_actual, 'measure': data})
     #df = df.set_index(['time'])
     return df
 
 # return (time, id, ct, measure)
 def multi_random_data():
-    ids = list(loads.keys())
-    #ids = ['5737333034370A220D', '5737333034370D0E14']
-    cts = list(set(np.array(list(
-        map(lambda x: list(x.keys()), loads.values()))).flat)) 
-    #cts = ['ct1', 'ct2', 'ct3', 'ct4']
+    ids = loadsdf.id.unique()
+    cts = loadsdf.ct.unique()
 
     num_rows = 1000000
     time_actual = jitter_time(num_rows)
@@ -55,28 +48,30 @@ def multi_random_data():
 
     df = pd.DataFrame(data={'id':id, 'ct':ct, 'measure':measure},
                       index=time_actual)
+    df.set_index(df.index.rename('time'), inplace=True)
     return df
 
 def read_raw(filename):
-    raw_data = pd.read_csv(filename, delim_whitespace=True, comment='#',
-                           index_col=0, parse_dates=True)
-    return raw_data
+    return pd.read_csv(filename, delim_whitespace=True, comment='#',
+                       index_col=0, parse_dates=True)
+
+def resolve_name(raw_data):
+    x = raw_data.reset_index().merge(loadsdf, on=['id','ct'])
+    x.set_index(keys='time', inplace=True)
+    x.sort_index(inplace=True)
+    return x
 
 # treat each load separately, then merge at the end
-def make_multi_hourly(raw_data):
-    pd.set_option('display.max_rows', None)
-    raw_data['load'] = raw_data.copy().apply(load_name, axis=1)
+# input (time, measure, load)
+# return (time, measure, load)
+def make_multi_hourly(load_data):
     hourly = pd.DataFrame(columns=['measure'])
-    for load in list(set(raw_data['load'])):
+    for load in list(set(load_data['load'])):
         hourly = hourly.append(
-            make_hourly(raw_data[raw_data['load']==load][['measure']])
+            make_hourly(load_data[load_data['load']==load][['measure']])
             .assign(load=load))
     group = hourly.groupby(level=0).sum()
-    #print("group")
-    #print(group)
     hourly = hourly.append(group.assign(load='total'))
-    #print("hourly")
-    #print(hourly)
     return hourly
 
 def make_hourly(raw_data):
@@ -86,13 +81,15 @@ def make_hourly(raw_data):
         [pd.DataFrame(
             index=[raw_data.index.min() - pd.DateOffset(seconds=1)],
             data=[0], columns=['measure']), raw_data])
+    raw_data.set_index(raw_data.index.rename('time'), inplace=True)
 
     # Bucket boundaries we want, with some left padding to be sure we
     # can set the first to zero
     buckets = pd.DataFrame(
         pd.date_range(
             start=raw_data.index.min().floor('H') - pd.DateOffset(hours=1),
-            end=raw_data.index.max().ceil('H'), freq='H')).set_index(0)
+            end=raw_data.index.max().ceil('H'), freq='H')
+        ).set_index(0)
 
     # Insert bucket boundaries into the raw dataset (they'll have NaN
     # measures)
