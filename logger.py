@@ -1,34 +1,16 @@
-import io #, webbrowser
 import numpy as np
 import pandas as pd
-import csv
-import threading
-import sys
-import time
-import traceback
-import warnings
-#import scipy.integrate as it
-
+import csv, io, sys, threading, time, traceback, warnings
 from flask import Flask, Response, request, render_template_string
 from matplotlib.backends.backend_svg import FigureCanvasSVG
 from matplotlib.figure import Figure
 from waitress import serve
-
 import lib
 
 RAW_DATA_FILENAME = 'data_raw.csv'
 HOURLY_DATA_FILENAME = 'data_hourly.csv'
 
 app = Flask(__name__)
-
-def plot_raw_data(raw_data, fig):
-    ax = fig.add_subplot(4,1,1)
-    ax.set_title('raw observed power (1k points)')
-    ax.set_ylabel('watts')
-    (raw_data
-        .tail(1000)
-        .plot(ax=ax, y='measure', style='o', legend=False)
-    )
 
 def plot_multi_raw_data(load_data, fig):
     loads = list(set(load_data['load']))
@@ -90,63 +72,6 @@ def plot_multi_rollups(hourly, fig):
         )
     ax.legend(loads, loc='upper left')
 
-def plot_rollups(hourly, fig):
-    right = min(pd.Timestamp.now(),hourly.index.max())
-    ax = fig.add_subplot(4,1,2)
-    ax.set_title('kWh by hour (168 hours)')
-    ax.set_ylabel('kilowatt-hours')
-    left = (right - pd.DateOffset(hours=168)).ceil('H')
-    (hourly
-        .loc[hourly.index > left]
-        .resample(rule='H').sum()
-        .plot(ax=ax, style='o', legend=False)
-    )
-
-    ax = fig.add_subplot(4,1,3)
-    ax.set_title('kWh by day (31 days)')
-    ax.set_ylabel('kilowatt-hours')
-    left = (right - pd.DateOffset(days=31)).ceil('D')
-    (hourly
-         .loc[hourly.index > left]
-         .resample(rule='D').sum()
-         .plot(ax=ax, style='o', legend=False)
-    )
-
-    ax = fig.add_subplot(4,1,4)
-    ax.set_title('kWh by month (12 months)')
-    ax.set_ylabel('kilowatt-hours')
-    # month needs special treatment since it's variable freq
-    left = (right - pd.DateOffset(months=12)).to_datetime64().astype('<M8[M]')
-    (hourly
-        .loc[hourly.index > left]
-        .resample(rule='MS').sum()
-        .plot(ax=ax, style='o', legend=False)
-    )
-
-@app.route("/")
-def index():
-    fig = Figure(figsize=(10,15))
-    fig.set_tight_layout(True) # Make sure the titles don't overlap
-
-    # (time, id, ct, measure)
-    raw_data = lib.read_raw_no_header(RAW_DATA_FILENAME)
-    load_data = lib.resolve_name(raw_data)
-    plot_multi_raw_data(load_data, fig)
-
-    hourly = lib.read_hourly_no_header(HOURLY_DATA_FILENAME)
-    plot_multi_rollups(hourly, fig)
-
-    # Give the SVG to the browser
-    output = io.BytesIO()
-    FigureCanvasSVG(fig).print_svg(output)
-    monthly_total = (hourly[hourly['load']=='total'][['measure']]
-                     .resample(rule='MS').sum())
-    return render_template_string(f"""
-        {output.getvalue().decode("utf-8")}
-        <p>kWh/mo</p>
-        {monthly_total.to_html(header=False)}
-    """)
-
 # continuously read serial inputs and write data to the raw data file 
 def data_reader():
     serials = []
@@ -200,7 +125,30 @@ def summarizer():
             traceback.print_exc(file=sys.stderr)
             print("top level exception",
                   sys.exc_info()[0], file=sys.stderr)
-        
+
+@app.route("/")
+def index():
+    fig = Figure(figsize=(10,15))
+    fig.set_tight_layout(True) # Make sure the titles don't overlap
+
+    # (time, id, ct, measure)
+    raw_data = lib.read_raw_no_header(RAW_DATA_FILENAME)
+    load_data = lib.resolve_name(raw_data)
+    plot_multi_raw_data(load_data, fig)
+
+    hourly = lib.read_hourly_no_header(HOURLY_DATA_FILENAME)
+    plot_multi_rollups(hourly, fig)
+
+    # Give the SVG to the browser
+    output = io.BytesIO()
+    FigureCanvasSVG(fig).print_svg(output)
+    monthly_total = (hourly[hourly['load']=='total'][['measure']]
+                     .resample(rule='MS').sum())
+    return render_template_string(f"""
+        {output.getvalue().decode("utf-8")}
+        <p>kWh/mo</p>
+        {monthly_total.to_html(header=False)}
+    """)
 
 def main():
     warnings.filterwarnings('ignore')
