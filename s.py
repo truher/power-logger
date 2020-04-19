@@ -1,7 +1,11 @@
 import io #, webbrowser
 import numpy as np
 import pandas as pd
+import csv
 import threading
+import sys
+import time
+import traceback
 #import scipy.integrate as it
 
 from flask import Flask, Response, request, render_template_string
@@ -144,15 +148,64 @@ def index():
         {monthly_total.to_html(header=False)}
     """)
 
-# write data to the raw data file 
+# continuously read serial inputs and write data to the raw data file 
 def data_reader():
-    pass
+    serials = []
+    # trim every 30 sec
+    freq = 30
+    # retain 100k rows (8 obs/sec, 3600 sec/h, 3h)
+    size = 100000
+    filename = 'data_raw.csv'
+    while True:
+        try:
+            # write <freq> lines
+            with open(filename, 'a') as sink:
+                for lines in range(freq):
+                    serials = lib.transcribe_all(serials, sink)
+            # trim the file
+            lib.trim(filename, size) 
+        except:
+            traceback.print_exc(file=sys.stderr)
+            print("top level exception",
+                      sys.exc_info()[0], file=sys.stderr)
 
-# notice when the raw data file is updated and update the summary file
+# periodically read the raw file and update the hourly file
 def summarizer():
-    pass
+    raw_filename = 'data_raw.csv'
+    hourly_filename = 'data_hourly.csv'
+    while True:
+        try:
+            time.sleep(60)
+            # all the raw data available
+            raw_data = lib.read_raw_no_header(raw_filename)
+            load_data = lib.resolve_name(raw_data)
+            # all the hourly data available
+            hourly = lib.make_multi_hourly(load_data)
+            # this is the previously written history
+            hourly_file = lib.read_hourly_no_header(hourly_filename)
+            # the first hour in this set is surely partial; ignore it
+            # unless the history is also empty
+            if len(hourly) > 0 and len(hourly_file) > 0:
+                hourly = hourly.drop(hourly.index[0])
+            # remove rows corresponding to the new summary
+            hourly_file = hourly_file[~hourly_file.index.isin(hourly.index)]
+            # append the new summary
+            hourly_file = hourly_file.append(hourly)
+            hourly_file.sort_index(inplace=True)
+            # write the result to 6 sig fig
+            hourly_file.to_csv(hourly_filename, sep=' ',
+                               date_format='%Y-%m-%dT%H:%M:%S.%f',
+                               quoting=csv.QUOTE_NONE,
+                               float_format='%6g')
+
+        except:
+            traceback.print_exc(file=sys.stderr)
+            print("top level exception",
+                  sys.exc_info()[0], file=sys.stderr)
+        
 
 def main():
+    threading.Thread(target=data_reader).start()
     threading.Thread(target=summarizer).start()
     # Waitress is the recommended flask runner
     serve(app, host="0.0.0.0", port=5000)

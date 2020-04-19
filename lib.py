@@ -1,7 +1,11 @@
 import numpy as np
 import pandas as pd
 import serial
+import sys
+import os
+
 from datetime import datetime
+from glob import glob
 from scipy import integrate
 
 loadsdf = pd.DataFrame(data={
@@ -55,9 +59,25 @@ def multi_random_data():
 
 # return (time, id, ct, measure)
 def read_raw_no_header(filename):
-    return pd.read_csv(filename, delim_whitespace=True, comment='#',
+    if os.path.isfile(filename):
+        return pd.read_csv(filename, delim_whitespace=True, comment='#',
                        index_col=0, parse_dates=True, header=0,
                        names=['time','id','ct','measure'])
+    else:
+        x = pd.DataFrame(columns=['time','id','ct','measure'])
+        x.set_index(keys='time', inplace=True)
+        return x
+
+# return (time, measure, load)
+def read_hourly_no_header(filename):
+    if os.path.isfile(filename):
+        return pd.read_csv(filename, delim_whitespace=True, comment='#',
+                       index_col=0, parse_dates=True, header=0,
+                       names=['time','measure','load'])
+    else:
+        x = pd.DataFrame(columns=['time','measure','load'])
+        x.set_index(keys='time', inplace=True)
+        return x
 
 def read_raw(filename):
     return pd.read_csv(filename, delim_whitespace=True, comment='#',
@@ -124,6 +144,8 @@ def make_hourly(raw_data):
         loffset='-1H').max().diff().dropna().iloc[1:]
     return hourly
 
+# read a line from source, prepend timestamp, write it to sync
+# close the source if something goes wrong
 def transcribe(sink):
     def f(source):
         try:
@@ -135,3 +157,74 @@ def transcribe(sink):
             print("fail", source.port, file=sys.stderr)
             source.close()
     return f
+
+def trim(filename, count):
+    lines = []
+    with open(filename, 'r') as source:
+        lines = source.readlines()
+    lines = lines[-count:]
+    print(len(lines))
+    with open(filename, 'w') as sink:
+        sink.writelines(lines)
+
+def parse(line):
+    try:
+        result = {}
+        fields = line.split()
+        if len(fields) != 4:
+            raise ValueError(f'wrong field count: {line}')
+
+        time_str = fields[0]
+        result['time'] = datetime.fromisoformat(time_str)
+
+        id_str = fields[1]
+        if len(id_str) != 18:
+            raise ValueError(f'wrong id length: {id_str}')
+        result['id'] = id_str
+
+        ct_str = fields[2]
+        if len(ct_str) != 3:
+            raise ValueError(f'wrong ct length: {ct_str}')
+        result['ct'] = ct_str
+
+        measure_str = fields[3]
+        result['measure'] = float(measure_str)
+        return result
+
+    except ValueError:
+        print(f'ignore broken line: {line}', file=sys.stderr)
+
+def new_serial(port):
+    print(f'new {port}', file=sys.stderr, flush=True)
+    return serial.Serial(port, 9600, 8, 'N', 1, timeout=1)
+
+def is_open(ser):
+    if ser.is_open:
+        return True
+    print(f'closed {ser.port}', file=sys.stderr, flush=True)
+    return False
+
+def has_tty(ttys):
+    def f(ser):
+        if ser.port in ttys:
+            return True
+        print(f'no tty {ser.port}', file=sys.stderr, flush=True)
+        return False
+    return f
+
+def no_serial(serials):
+    current_ports = [*map(lambda x: x.port, serials)]
+    def f(tty):
+        if tty in current_ports:
+            return False
+        print(f'no serial {tty}', file=sys.stderr, flush=True)
+        return True
+    return f
+
+# maintain connections and transcribe them all
+def transcribe_all(serials, sink):
+    ttys = glob("/dev/ttyACM*")
+    serials = [*filter(lambda x: is_open(x) and has_tty(ttys)(x), serials)]
+    serials.extend([*map(new_serial, filter(no_serial(serials), ttys))])
+    [*map(transcribe(sink), serials)]
+    return serials

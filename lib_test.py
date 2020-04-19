@@ -5,6 +5,21 @@ import unittest
 # show how to do a unittest of a naked function
 
 class TestRandom(unittest.TestCase):
+    def test_parse(self):
+        self.assertIsNone(lib.parse(""))
+        self.assertIsNone(lib.parse("a b c d"))
+        self.assertIsNone(lib.parse("2020-04-18T17:04:27.322422 b c d"))
+        self.assertIsNone(lib.parse(
+            "2020-04-18T17:04:27.322422 abcdefghijklmnopqr c d"))
+        self.assertIsNone(lib.parse(
+            "2020-04-18T17:04:27.322422 abcdefghijklmnopqr xyz d"))
+        x = lib.parse(
+            "2020-04-18T17:04:27.322422 abcdefghijklmnopqr xyz 1.0")
+        self.assertEqual("2020-04-18 17:04:27.322422", str(x['time']))
+        self.assertEqual("abcdefghijklmnopqr", x['id'])
+        self.assertEqual("xyz", x['ct'])
+        self.assertAlmostEqual(1.0, x['measure'], 3)
+
     def test_transcribe(self):
         sink = io.StringIO()
         source = io.BytesIO(b"asdf\n")
