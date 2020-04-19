@@ -193,8 +193,9 @@ def summarizer():
             hourly_file = hourly_file.append(hourly)
             hourly_file.sort_index(inplace=True)
             # write the result to 6 sig fig
+                               #date_format='%Y-%m-%dT%H:%M:%S',
             hourly_file.to_csv(hourly_filename, sep=' ',
-                               date_format='%Y-%m-%dT%H:%M:%S.%f',
+                               date_format='%Y-%m-%dT%H',
                                quoting=csv.QUOTE_NONE,
                                float_format='%6g')
 

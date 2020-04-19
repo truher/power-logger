@@ -163,7 +163,6 @@ def trim(filename, count):
     with open(filename, 'r') as source:
         lines = source.readlines()
     lines = lines[-count:]
-    print(len(lines))
     with open(filename, 'w') as sink:
         sink.writelines(lines)
 
