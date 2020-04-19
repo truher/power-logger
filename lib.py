@@ -8,6 +8,7 @@ from datetime import datetime
 from glob import glob
 from scipy import integrate
 
+# frame so we can use "merge" to join for the load names
 loadsdf = pd.DataFrame(data={
           'id':["5737333034370D0E14", "5737333034370D0E14",
                 "5737333034370D0E14", "5737333034370D0E14",
@@ -17,45 +18,6 @@ loadsdf = pd.DataFrame(data={
                 'ct1', 'ct2', 'ct3', 'ct4'],
           'load':['load1', 'load2', 'load3', 'load4',
                   'load5', 'load6', 'load7', 'load8']})
-
-def jitter_time(num_rows):
-    time_ideal = pd.date_range(end=pd.Timestamp.now(), periods=num_rows,
-                               freq='10S')
-    time_deltas  = pd.to_timedelta(np.random.uniform(-1, 1, num_rows),
-                                   unit='S')
-    time_actual = time_ideal + time_deltas
-    return time_actual
-
-# return (time, measure)
-def random_data():
-    num_rows = 1000000
-    time_actual = jitter_time(num_rows)
-
-    #data  = np.random.uniform(0.99, 1.01, num_rows)
-    # lognormal(0,1) has mean exp(0.5) or about 1.65
-    measure = np.random.lognormal(0, 1, num_rows)
-
-    df = pd.DataFrame(data={'measure': measure}, index=time_actual)
-    df.set_index(df.index.rename('time'), inplace=True)
-    #df = pd.DataFrame(data={'time': time_actual, 'measure': data})
-    #df = df.set_index(['time'])
-    return df
-
-# return (time, id, ct, measure)
-def multi_random_data():
-    ids = loadsdf.id.unique()
-    cts = loadsdf.ct.unique()
-
-    num_rows = 1000000
-    time_actual = jitter_time(num_rows)
-    ct = [*map(lambda x: cts[x], np.random.randint(0,4, num_rows))]
-    id = [*map(lambda x: ids[x], np.random.randint(0,2, num_rows))]
-    measure = np.random.lognormal(0, 1, num_rows)
-
-    df = pd.DataFrame(data={'id':id, 'ct':ct, 'measure':measure},
-                      index=time_actual)
-    df.set_index(df.index.rename('time'), inplace=True)
-    return df
 
 # return (time, id, ct, measure)
 def read_raw_no_header(filename):
@@ -73,16 +35,13 @@ def read_hourly_no_header(filename):
     if os.path.isfile(filename):
         return pd.read_csv(filename, delim_whitespace=True, comment='#',
                        index_col=0, parse_dates=True, header=0,
-                       names=['time','measure','load'])
+                       names=['time','load','measure'])
     else:
-        x = pd.DataFrame(columns=['time','measure','load'])
+        x = pd.DataFrame(columns=['time','load','measure'])
         x.set_index(keys='time', inplace=True)
         return x
 
-def read_raw(filename):
-    return pd.read_csv(filename, delim_whitespace=True, comment='#',
-                       index_col=0, parse_dates=True)
-
+# append a column for load name based on id and ct
 def resolve_name(raw_data):
     x = raw_data.reset_index().merge(loadsdf, on=['id','ct'])
     x.set_index(keys='time', inplace=True)
@@ -100,8 +59,11 @@ def make_multi_hourly(load_data):
             .assign(load=load))
     group = hourly.groupby(level=0).sum()
     hourly = hourly.append(group.assign(load='total'))
+    hourly = hourly.reindex(columns=['measure','load'])
     return hourly
 
+# accept (time, measure)
+# return (time (hour), measure (total))
 def make_hourly(raw_data):
     # provide a zero just before the first point, so integration sees
     # the first point but nothing before it
@@ -158,6 +120,7 @@ def transcribe(sink):
             source.close()
     return f
 
+# trim file <filename> to latest <count> lines
 def trim(filename, count):
     lines = []
     with open(filename, 'r') as source:
@@ -166,6 +129,7 @@ def trim(filename, count):
     with open(filename, 'w') as sink:
         sink.writelines(lines)
 
+# return (time, id, ct, measure) from string
 def parse(line):
     try:
         result = {}
@@ -193,6 +157,7 @@ def parse(line):
     except ValueError:
         print(f'ignore broken line: {line}', file=sys.stderr)
 
+# create new serial stream
 def new_serial(port):
     print(f'new {port}', file=sys.stderr, flush=True)
     return serial.Serial(port, 9600, 8, 'N', 1, timeout=1)

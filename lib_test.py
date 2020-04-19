@@ -4,7 +4,7 @@ import unittest
 
 # show how to do a unittest of a naked function
 
-class TestRandom(unittest.TestCase):
+class TestLib(unittest.TestCase):
     def test_parse(self):
         self.assertIsNone(lib.parse(""))
         self.assertIsNone(lib.parse("a b c d"))
@@ -54,23 +54,8 @@ class TestRandom(unittest.TestCase):
         self.assertEqual("there\n", buf.readline().decode('ascii'))
         self.assertFalse(buf.readline())
 
-    def test_jitter_time(self):
-        x = lib.jitter_time(10)
-        self.assertEqual(10, len(x))
-
-    def test_random_data(self):
-        x = lib.random_data()
-        self.assertEqual(1000000, len(x), 'size must be 1e6')
-
-    def test_multi_random_data(self):
-        x = lib.multi_random_data()
-        self.assertEqual(1000000, len(x), 'size must be 1e6')
-
-    def test_read_raw(self):
-        raw_data = lib.read_raw('test_data.csv')
-        self.assertEqual(3, len(raw_data))
-        self.assertCountEqual(['measure'], list(raw_data.columns))
-        raw_data = lib.read_raw('test_data_multi.csv')
+    def test_read_raw_no_header(self):
+        raw_data = lib.read_raw_no_header('test_data_multi.csv')
         self.assertEqual(24, len(raw_data))
         self.assertCountEqual(['id','ct','measure'], list(raw_data.columns))
         raw_data = lib.read_raw_no_header('test_data_long.csv')
@@ -78,19 +63,21 @@ class TestRandom(unittest.TestCase):
         self.assertCountEqual(['id','ct','measure'], list(raw_data.columns))
 
     def test_resolve_name(self):
-        raw_data = lib.read_raw('test_data_multi.csv')
+        raw_data = lib.read_raw_no_header('test_data_multi.csv')
         load_data = lib.resolve_name(raw_data)
         self.assertEqual(24, len(load_data))
 
     def test_make_multi_hourly(self):
-        raw_data = lib.read_raw('test_data_multi.csv')
+        raw_data = lib.read_raw_no_header('test_data_multi.csv')
         load_data = lib.resolve_name(raw_data)
         hourly = lib.make_multi_hourly(load_data)
         self.assertEqual(16, len(hourly),'one per load plus total')
 
     def test_make_hourly(self):
-        raw_data = lib.read_raw('test_data.csv')
-        hourly = lib.make_hourly(raw_data)
+        raw_data = lib.read_raw_no_header('test_data_multi.csv')
+        load_data = lib.resolve_name(raw_data)
+        hourly = lib.make_hourly(
+                 load_data[load_data['load']=='load1'][['measure']])
         self.assertEqual(1, len(hourly), 'all data is in 14:00')
         self.assertAlmostEqual(0.0001667, hourly.iloc[0].at['measure'],
             places=7, msg='total is 0.0001667')

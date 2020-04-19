@@ -1,9 +1,0 @@
-# test data to work out by hand.
-# should result in:
-# 0.28125, 0.68750, 0.03125 mean watts for each 10 min bucket
-# 2.8125, 6.8750, 0.3125 watt-min per 10-min bucket
-# 10 w-min total, or 0.000166.. kWh.
-time	measure
-2020-04-04T14:32:30	0
-2020-04-04T14:42:30	1
-2020-04-04T14:52:30	0

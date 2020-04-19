@@ -6,6 +6,7 @@ import threading
 import sys
 import time
 import traceback
+import warnings
 #import scipy.integrate as it
 
 from flask import Flask, Response, request, render_template_string
@@ -14,6 +15,9 @@ from matplotlib.figure import Figure
 from waitress import serve
 
 import lib
+
+RAW_DATA_FILENAME = 'data_raw.csv'
+HOURLY_DATA_FILENAME = 'data_hourly.csv'
 
 app = Flask(__name__)
 
@@ -124,22 +128,17 @@ def index():
     fig = Figure(figsize=(10,15))
     fig.set_tight_layout(True) # Make sure the titles don't overlap
 
-    raw_data = lib.read_raw_no_header('test_data_long.csv')
-    #raw_data = lib.multi_random_data()
-    #raw_data = lib.random_data()
-    #raw_data = lib.read_raw('test_data.csv') # show test data
+    # (time, id, ct, measure)
+    raw_data = lib.read_raw_no_header(RAW_DATA_FILENAME)
     load_data = lib.resolve_name(raw_data)
-    #plot_raw_data(raw_data, fig)
     plot_multi_raw_data(load_data, fig)
-    hourly = lib.make_multi_hourly(load_data)
-    #hourly = lib.make_hourly(raw_data)
-    #plot_rollups(hourly, fig)
+
+    hourly = lib.read_hourly_no_header(HOURLY_DATA_FILENAME)
     plot_multi_rollups(hourly, fig)
 
     # Give the SVG to the browser
     output = io.BytesIO()
     FigureCanvasSVG(fig).print_svg(output)
-    #return Response(output.getvalue(), mimetype="image/svg+xml")
     monthly_total = (hourly[hourly['load']=='total'][['measure']]
                      .resample(rule='MS').sum())
     return render_template_string(f"""
@@ -153,17 +152,16 @@ def data_reader():
     serials = []
     # trim every 30 sec
     freq = 30
-    # retain 100k rows (8 obs/sec, 3600 sec/h, 3h)
+    # retain 15k rows (1 obs/sec, 3600 sec/h, 4h)
     size = 100000
-    filename = 'data_raw.csv'
     while True:
         try:
             # write <freq> lines
-            with open(filename, 'a') as sink:
+            with open(RAW_DATA_FILENAME, 'a') as sink:
                 for lines in range(freq):
                     serials = lib.transcribe_all(serials, sink)
             # trim the file
-            lib.trim(filename, size) 
+            lib.trim(RAW_DATA_FILENAME, size) 
         except:
             traceback.print_exc(file=sys.stderr)
             print("top level exception",
@@ -171,18 +169,16 @@ def data_reader():
 
 # periodically read the raw file and update the hourly file
 def summarizer():
-    raw_filename = 'data_raw.csv'
-    hourly_filename = 'data_hourly.csv'
     while True:
         try:
             time.sleep(60)
             # all the raw data available
-            raw_data = lib.read_raw_no_header(raw_filename)
+            raw_data = lib.read_raw_no_header(RAW_DATA_FILENAME)
             load_data = lib.resolve_name(raw_data)
             # all the hourly data available
             hourly = lib.make_multi_hourly(load_data)
             # this is the previously written history
-            hourly_file = lib.read_hourly_no_header(hourly_filename)
+            hourly_file = lib.read_hourly_no_header(HOURLY_DATA_FILENAME)
             # the first hour in this set is surely partial; ignore it
             # unless the history is also empty
             if len(hourly) > 0 and len(hourly_file) > 0:
@@ -194,10 +190,11 @@ def summarizer():
             hourly_file.sort_index(inplace=True)
             # write the result to 6 sig fig
                                #date_format='%Y-%m-%dT%H:%M:%S',
-            hourly_file.to_csv(hourly_filename, sep=' ',
+            hourly_file.to_csv(HOURLY_DATA_FILENAME,
+                               sep=' ',
                                date_format='%Y-%m-%dT%H',
                                quoting=csv.QUOTE_NONE,
-                               float_format='%6g')
+                               float_format='%.6g')
 
         except:
             traceback.print_exc(file=sys.stderr)
@@ -206,9 +203,9 @@ def summarizer():
         
 
 def main():
+    warnings.filterwarnings('ignore')
     threading.Thread(target=data_reader).start()
     threading.Thread(target=summarizer).start()
-    # Waitress is the recommended flask runner
     serve(app, host="0.0.0.0", port=5000)
 
 if __name__ == "__main__":
