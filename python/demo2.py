@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import matplotlib.ticker as ticker
 
 pd.set_option('display.max_columns', 20)
 pd.set_option('display.width', 2000)
@@ -10,11 +12,12 @@ pd.set_option('display.min_rows', 20)
 pd.set_option('display.max_rows', 40)
 
 
-raw_data = pd.read_csv('l3.csv', delim_whitespace=True, header=0,
+raw_data = pd.read_csv('l3.csv', delim_whitespace=True, header=None,
                names=['time','err','id','ct','v_first','dv','a_first','da'])
 print(f"errors {len(raw_data[raw_data.err != 0])}")
 raw_data = raw_data[raw_data.err == 0] # ignore error rows
 raw_data = raw_data.drop(labels=['err'], axis=1)
+raw_data['row'] = raw_data.index
 print(raw_data)
 #raw_data['dvbs'] = raw_data.dv.apply(lambda x: [y-256 if y > 127 else y for y in list(bytes.fromhex(x))])
 #raw_data['dabs'] = raw_data.da.apply(lambda x: [y-256 if y > 127 else y for y in list(bytes.fromhex(x))])
@@ -51,12 +54,35 @@ raw_data['actual_time'] = (raw_data['datetime']
 raw_data = raw_data.set_index('actual_time')
 raw_data = raw_data.drop(labels=['datetime','offset','time','is_v','idx','v_first','a_first','dvbs','dabs'],axis=1)
 print(raw_data)
+
+def doit(x):
+    onerow = raw_data.loc[raw_data['row']==x][['id','ct','row','vbs','abs']]
+    #print("onerow")
+    #print(onerow)
+    interp = onerow.interpolate(method='time',limit_direction='both')
+    #print("interp")
+    #print(interp)
+    return interp
+
+print("calculate y...")
+y = pd.DataFrame()
+y = y.append([doit(x) for x in list(raw_data.row.unique())])
+print("done!")
+print("y")
+print(y)
+print(y.dtypes)
+print(y.describe(include='all'))
 #raw_data.plot(x='vbs',y='abs')
 #plt.show()
-fig, ax = plt.subplots(len(raw_data.ct.unique()))
+#fig, ax = plt.subplots(len(raw_data.ct.unique()))
+fig, ax = plt.subplots()
 fig.set_tight_layout(True)
 def doplot(x):
-    raw_data[raw_data.ct==x[1]][['vbs','abs']].plot(ax=ax[x[0]],style='-o',x='vbs',y='abs',legend=False)
+    y[y.ct==x[1]][['vbs','abs']].plot(ax=ax,style='-o',y=['vbs','abs'],label=[f'{x[1]}v',f'{x[1]}a'])
+    #y[y.ct==x[1]][['vbs','abs']].plot(ax=ax[x[0]],style='-o',x='vbs',y='abs',legend=False)
     #raw_data[(raw_data.index<4) & (raw_data.ct==x[1])][['idx','abs']].plot(ax=ax[x[0]],style='-o',x='idx',y='abs',legend=False)
 [doplot(x) for x in enumerate(raw_data.ct.unique())]
+#ax.legend(y.ct.unique())
+ax.xaxis.set_major_locator(ticker.MaxNLocator(10))
+ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%dT%H:%M:%S.%f'))
 plt.show()

@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 
-raw_data = pd.read_csv('d.csv', sep=' ', header=0,
+raw_data = pd.read_csv('d.csv', sep=' ', header=None,
                 names=['time','id','ct','offset','type','measure'])
 raw_data['datetime'] = pd.to_datetime(raw_data['time'])
 raw_data['actual_time'] = (raw_data['datetime']
@@ -28,19 +28,19 @@ print(raw_data)
 def doit(x):
     #// selects one ct
     onect = raw_data[raw_data['ct']==x][['ct','type','measure']]
-    #print("onect")
-    #print(onect)
+    print("onect")
+    print(onect)
     onectpivot = (pd.pivot_table(onect,
                      values='measure',index=['actual_time'],columns=['type'])
                    .assign(ct=x))
-    #print("onectpivot")
-    #print(onectpivot)
+    print("onectpivot")
+    print(onectpivot)
     interp = onectpivot.interpolate(method='time',limit_direction='both')
-    #print("interp")
-    #print(interp)
+    print("interp")
+    print(interp)
     interp['p'] = interp['i'] * interp['v']
-    #print("interp")
-    #print(interp)
+    print("interp")
+    print(interp)
     return interp
 
 
