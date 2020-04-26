@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import pandas as pd
-from matplotlib.figure import Figure
 
 raw_data = pd.read_csv('d.csv', sep=' ', header=0,
                 names=['time','id','ct','offset','type','measure'])
@@ -54,7 +53,6 @@ y = y.append([doit(x) for x in list(raw_data.ct.unique())])
 print(y)
 #print(y.ct.unique())
 #[*map(lambda x: print(x), y.ct.unique())]
-#fig = Figure(figsize=(10,10))
 fig, ax = plt.subplots(len(y.ct.unique()))
 fig.set_tight_layout(True)
 #[*map(lambda x: y[y.ct==x][['p']].plot(ax=ax,style='o',legend=False), y.ct.unique())]
