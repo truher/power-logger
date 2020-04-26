@@ -9,8 +9,8 @@ char uidStr[20] = {0};
 const unsigned int ROWS = 1000;
 
 // observations from analogRead()
-int8_t volts[ROWS];
-int8_t amps[ROWS];
+uint8_t volts[ROWS];
+uint8_t amps[ROWS];
 
 // which observation we're making, also the read/print semaphore
 int row = 0;
@@ -50,44 +50,57 @@ void setup() {
   TCCR1A = 0;
   TCCR1B = 0;
   TCNT1  = 0;
-  OCR1A = 800;  // compare match register 16MHz/1/10khz/2 samples (50us)
+  //OCR1A = 800;  // compare match register 16MHz/1/10khz/2 samples (50us) = 6 cycles per measurement
+  OCR1A = 1600;  // compare match register 16MHz/1/5khz/2 samples (100us) = 12 cycles per measurement
   TCCR1B |= (1 << WGM12);  // CTC mode
   TCCR1B |= (1 << CS10);  // prescale = 1
   TIMSK1 |= (1 << OCIE1A);  // enable timer compare interrupt
   interrupts();
 }
+int v = 0;
+int a = 0;
+int vv = 0;
+int aa = 0;
 
 ISR(TIMER1_COMPA_vect) {
   if (row >= ROWS) return;  // wait for printing to be done
 
   switch (column) {
     case VOLTS:
-      int v = analogRead(0);
+      v = analogRead(0);
       if (row == 0) {
         v_first = v;
-        volts[0] = 0;
-        v_prev = v;
+        volts[0] = 128;
       } else {
-        int vv = v - v_prev;
-        if (vv > 127 || vv < -128) err = true;
-        volts[row] = (int8_t) vv;
-        v_prev = v;
+        vv = v - v_prev + 128;
+        if (vv > 255 || vv < 0) {
+          err = true;
+          volts[row] = 128;
+        } else {
+          volts[row] = (uint8_t) vv;
+        }
       }
+      v_prev = v;
       column = AMPS;
+      break;
     case AMPS:
-      int a = analogRead(ct);
+      a = analogRead(ct);
       if (row == 0) {
         a_first = a;
-        amps[0] = 0;
-        a_prev = a;
+        amps[0] = 128;
       } else {
-        int aa = a - a_prev;
-        if (aa > 127 || aa < -128) err = true;
-        amps[row] = (int8_t) (a - a_prev);
-        a_prev = a;
+        aa = a - a_prev + 128;
+        if (aa > 255 || aa < 0) {
+          err = true;
+          amps[row] = 128;
+        } else {
+          amps[row] = (uint8_t) aa;
+        }
       }
+      a_prev = a;
       column = VOLTS;
       ++row;
+      break;
   }
 
   if(row >= ROWS)
@@ -99,10 +112,8 @@ void loop() {
 
   digitalWrite(LED_BUILTIN, digitalRead(LED_BUILTIN) ^ 1);
 
-  if (err) {
-    Serial.println("OVERFLOW");
-    err = false;
-  }
+  Serial.print(err);
+  Serial.print("\t");
   Serial.print(uidStr);
   Serial.print("\tct");
   Serial.print(ct);
@@ -125,6 +136,7 @@ void loop() {
   Serial.println();
 
   // restart measurement
+  err = false;
   ++ct;
   if (ct > 4) ct = 1;
   row = 0;
