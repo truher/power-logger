@@ -14,6 +14,8 @@ pd.set_option('display.max_rows', 40)
 
 raw_data = pd.read_csv('l3.csv', delim_whitespace=True, header=None,
                names=['time','err','id','ct','v_first','dv','a_first','da'])
+print(raw_data)
+raw_data['err'] = raw_data['err'].apply(pd.to_numeric, errors='coerce')
 print(f"errors {len(raw_data[raw_data.err != 0])}")
 raw_data = raw_data[raw_data.err == 0] # ignore error rows
 raw_data = raw_data.drop(labels=['err'], axis=1)
