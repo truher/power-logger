@@ -14,6 +14,7 @@ raw_data = pd.read_csv('l3.csv', delim_whitespace=True, header=0,
                names=['time','err','id','ct','v_first','dv','a_first','da'])
 print(f"errors {len(raw_data[raw_data.err != 0])}")
 raw_data = raw_data[raw_data.err == 0] # ignore error rows
+raw_data = raw_data.drop(labels=['err'], axis=1)
 print(raw_data)
 #raw_data['dvbs'] = raw_data.dv.apply(lambda x: [y-256 if y > 127 else y for y in list(bytes.fromhex(x))])
 #raw_data['dabs'] = raw_data.da.apply(lambda x: [y-256 if y > 127 else y for y in list(bytes.fromhex(x))])
@@ -34,6 +35,22 @@ print(raw_data.dtypes)
 print(raw_data.describe(include='all'))
 print(f"dvbs range {raw_data.dvbs.max() - raw_data.dvbs.min()}")
 print(f"dabs range {raw_data.dabs.max() - raw_data.dabs.min()}")
+# is this row volts?
+raw_data['is_v'] = [[1,0] for x in range(0,len(raw_data))]
+raw_data = raw_data.explode('is_v')
+# erase every other sample
+raw_data.loc[raw_data['is_v']==1,'abs']=np.nan
+raw_data.loc[raw_data['is_v']==0,'vbs']=np.nan
+# the last (999) sample is approximately at the timestamp,
+# other samples are earlier
+# offset in us
+raw_data['offset'] = (2 * (raw_data['idx'] - 999) - raw_data['is_v']) * 100
+raw_data['datetime'] = pd.to_datetime(raw_data['time'])
+raw_data['actual_time'] = (raw_data['datetime']
+                           + pd.to_timedelta(raw_data['offset'], unit='us'))
+raw_data = raw_data.set_index('actual_time')
+raw_data = raw_data.drop(labels=['datetime','offset','time','is_v','idx','v_first','a_first','dvbs','dabs'],axis=1)
+print(raw_data)
 #raw_data.plot(x='vbs',y='abs')
 #plt.show()
 fig, ax = plt.subplots(len(raw_data.ct.unique()))
