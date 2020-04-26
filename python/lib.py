@@ -160,7 +160,7 @@ def parse(line):
 # create new serial stream
 def new_serial(port):
     print(f'new {port}', file=sys.stderr, flush=True)
-    return serial.Serial(port, 9600, 8, 'N', 1, timeout=0.001)
+    return serial.Serial(port, 9600, 8, 'N', 1, timeout=1)
 
 def is_open(ser):
     if ser.is_open:
