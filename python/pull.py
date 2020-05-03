@@ -1,6 +1,6 @@
 from waitress import serve #type:ignore
 from flask import Flask, Response, render_template
-from typing import Any, Generator
+from typing import Any, Generator, Callable
 import time
 import numpy as np #type:ignore
 import orjson
@@ -16,11 +16,7 @@ rng = np.random.default_rng()
 #    return s
 
 @app.after_request
-def add_header(r):
-    """
-    Add headers to both force latest IE rendering engine or Chrome Frame,
-    and also to cache the rendered page for 10 minutes.
-    """
+def add_header(r:Response) -> Response:
     r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     r.headers["Pragma"] = "no-cache"
     r.headers["Expires"] = "0"
