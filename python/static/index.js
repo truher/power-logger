@@ -1,6 +1,5 @@
 const xScale = d3.scaleLinear().domain([-1, 1024]);
 const yScale = d3.scaleLinear().domain([-1, 1024]);
-const container = document.querySelector('d3fc-canvas');
 
 const series = fc.seriesWebglPoint()
     .crossValue(d => d.x)
@@ -19,21 +18,44 @@ const series = fc.seriesWebglPoint()
           gl.ONE_MINUS_SRC_ALPHA);
     });
 
+var multi = fc.seriesWebglMulti()
+    .series([series])
+    .mapping(function(d,i,s) { return d.values; });
+
+var gridlines = fc.annotationSvgGridline()
+
+const chart = fc.chartCartesian(xScale, yScale)
+    .webglPlotArea(multi)
+    .chartLabel(d => d.label)
+    .xLabel('x axis')
+    .yLabel('y axis')
+    .svgPlotArea(gridlines)
+    .yOrient('left') ;
+
+const container = document.querySelector('#small-multiples');
+
 d3.select(container)
     .on('measure', () => {
         xScale.range([0, event.detail.width]);
         yScale.range([event.detail.height, 0]);
-        series.context(container.querySelector('canvas').getContext('webgl'));
     })
     .on('draw', () => {
-        d3.text('/data').then(function(text) {
-            var data = d3.tsvParseRows(text, function(d) {
-                return {x:+d[0],y:+d[1]};
+        d3.json('/data').then(function(data) {
+            zipped = data.map(function(x){
+                zdz = d3.zip(x.x,x.y).map(function(d){return {x:d[0],y:d[1]}});
+                return {label: x.label, values:zdz}
             });
-            series(data);
+
+            d3.select('#small-multiples')
+                .selectAll('div#instance')
+                .data(zipped)
+                .join(
+                    enter => enter.append('div').attr('id', 'instance'),
+                    update => update.call(chart)
+                );
         });
     });
 
 container.requestRedraw();
 
-setInterval(() => {container.requestRedraw();}, 67); // 15 fps
+setInterval(() => {container.requestRedraw();}, 1000); // 15 fps

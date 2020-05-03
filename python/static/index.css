@@ -15,3 +15,28 @@ body > * {
     stroke: currentColor;
     stroke-opacity: 0.1;
 }
+
+  .area {
+    fill: #cec6b9;
+  }
+  #small-multiples > div {
+    display: inline-block;
+    width: 250px;
+    height: 250px;
+  }
+  .x-axis .domain, .x-axis .tick path,
+  .y-axis .domain, .y-axis .tick path {
+    display: none;
+  }
+  .x-axis {
+    height: 1.5em !important;
+  }
+  .gridline-x {
+    stroke: white;
+  }
+  d3fc-group.cartesian-chart > .x-label { font-size: 12px; }
+  d3fc-group.cartesian-chart > .y-label { font-size: 12px; }
+  d3fc-group.cartesian-chart .tick { font-size: 10px; }
+  d3fc-group.cartesian-chart .tick { font-size: 10px; }
+  d3fc-group.cartesian-chart > .chart-label { font-size: 16px; }
+  div#instance { margin: 12px; }
