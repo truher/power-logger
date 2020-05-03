@@ -12,6 +12,7 @@ from typing import List,Any,Tuple,IO,Iterable
 import binascii
 import itertools
 import operator
+import sys
 
 pd.set_option('display.max_columns', 20)
 pd.set_option('display.width', 2000)
@@ -42,15 +43,29 @@ def goodrow(x:List[bytes]) -> bool:
 def d(x:int) -> int:
     return x-128
 
-def bytes_to_array(x:List[bytes], c:int, f:int) -> Iterable[int]:
-    field = x[c]
+# from arduino
+OBSERVATION_COUNT = 1000
+# x vals for observations
+interp_xp = np.linspace(0, OBSERVATION_COUNT - 1, OBSERVATION_COUNT)
+# x vals for interpolations, adds in-between vals
+interp_x = np.linspace(0, OBSERVATION_COUNT - 1, 2 * OBSERVATION_COUNT - 1)
+
+def bytes_to_array(all_fields:List[bytes], data_col:int, first_col:int, trim_first:bool ) -> Any:
+    field = all_fields[data_col]
     decoded = binascii.unhexlify(field)
-    first = int(x[f])
+    first = int(all_fields[first_col])
     offsetted = (y-128 for y in decoded)
-    cumulative = itertools.accumulate(offsetted, func=operator.add, initial=first)
+    #cumulative = itertools.accumulate(offsetted, func=operator.add, initial=first)
+    cumulative = list(itertools.accumulate(offsetted, func=operator.add, initial=first))
     # TODO: stop encoding the first delta as zero
-    cumulative = itertools.islice(cumulative, 1, None)
-    return cumulative
+    #cumulative = list(itertools.islice(cumulative, 1, None))
+    cumulative.pop(0)
+    interpolated = np.interp(interp_x, interp_xp, cumulative)
+    if trim_first:
+        interpolated = interpolated[1:]
+    else:
+        interpolated = interpolated[:-1]
+    return interpolated
 
 #def cume():
     #return list(itertools.accumulate(decoded_fromhex))
@@ -62,15 +77,18 @@ allrowsfields = [x.split() for x in allrows]
 # remove bad rows, ~25 us
 allrowsfields = [x for x in allrowsfields if goodrow(x)]
 
-# volts is the first observation
-vbs = [bytes_to_array(x,5,4) for x in allrowsfields]
+# volts is the first observation, so trim the first value
+vbs = [bytes_to_array(x,5,4,True) for x in allrowsfields]
 
-# amps is the second observation
-abs = [bytes_to_array(x,7,6) for x in allrowsfields]
+# amps is the second observation, so trim the last value
+abs_ = [bytes_to_array(x,7,6,False) for x in allrowsfields]
 
-# arg another materialization
-vbsi20 = np.interp(np.linspace(0,999,1999),np.linspace(0,999,1000),list(vbs[20]))
-print(vbsi20)
+print(len(vbs[20]))
+print(vbs[20])
+plt.plot(vbs[20],abs_[20])
+plt.show()
+
+sys.exit()
 
 
 

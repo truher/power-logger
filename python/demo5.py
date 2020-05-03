@@ -93,3 +93,5 @@ def f4() -> pd.DataFrame:
     return pd.DataFrame(y4) # type:ignore
 t = timeit.timeit(f4,number=loops)
 print(f'f4 col dict of series {1e6*t/loops} us')
+
+
