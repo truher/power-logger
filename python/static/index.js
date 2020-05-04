@@ -1,38 +1,28 @@
 const xScale = d3.scaleLinear().domain([-1, 1024]);
 const yScale = d3.scaleLinear().domain([-1, 1024]);
 
-const series = fc.seriesWebglPoint()
+const series = fc.seriesCanvasPoint()
     .crossValue(d => d.x)
     .mainValue(d => d.y)
     .xScale(xScale)
     .yScale(yScale)
     .type(d3.symbolCircle)
-    .size(16)
-    .defined(() => true)
-    .equals(() => false)
-    .decorate(program => {
-        fc.webglFillColor([0.0,0.75,0.375,1.0])(program);
-        const gl = program.context();
-        gl.enable(gl.BLEND);
-        gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE,
-          gl.ONE_MINUS_SRC_ALPHA);
-    });
+    .size(16);
 
-var multi = fc.seriesWebglMulti()
+const multi = fc.seriesCanvasMulti()
     .series([series])
-    .mapping(function(d,i,s) { return d.values; });
-
-var gridlines = fc.annotationSvgGridline()
+    .mapping(function(d,i,s) { return d.value; });
 
 const chart = fc.chartCartesian(xScale, yScale)
-    .webglPlotArea(multi)
-    .chartLabel(d => d.label)
+    .canvasPlotArea(multi)
+    .chartLabel(d => d.key)
     .xLabel('x axis')
     .yLabel('y axis')
-    .svgPlotArea(gridlines)
     .yOrient('left') ;
 
 const container = document.querySelector('#small-multiples');
+
+let allloads = {};
 
 d3.select(container)
     .on('measure', () => {
@@ -41,14 +31,15 @@ d3.select(container)
     })
     .on('draw', () => {
         d3.json('/data').then(function(data) {
-            zipped = data.map(function(x){
-                zdz = d3.zip(x.x,x.y).map(function(d){return {x:d[0],y:d[1]}});
-                return {label: x.label, values:zdz}
+            data.map(function(row){
+                zdz = d3.zip(row.x,row.y).map(function(d){return {x:d[0],y:d[1]}});
+                allloads[row.label] = zdz;
             });
-
+            dd = d3.entries(allloads);
+            dd.sort((a,b)=>(a.key > b.key)?1:-1)
             d3.select('#small-multiples')
                 .selectAll('div#instance')
-                .data(zipped)
+                .data(dd)
                 .join(
                     enter => enter.append('div').attr('id', 'instance'),
                     update => update.call(chart)
@@ -58,4 +49,4 @@ d3.select(container)
 
 container.requestRedraw();
 
-setInterval(() => {container.requestRedraw();}, 1000); // 15 fps
+setInterval(() => {container.requestRedraw();}, 100);
