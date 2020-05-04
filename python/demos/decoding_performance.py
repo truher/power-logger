@@ -125,6 +125,7 @@ print(f'f5 cumsum elapsed time: {1e6*t/loops} us')
 l = list(range(0,1000))
 # 25 us
 def l1():
+    # type: () -> List[int]
     return [x for x in l if x != 500]
 t = timeit.timeit(l1,number=loops)
 print(f'l1 del elapsed time: {1e6*t/loops} us')
