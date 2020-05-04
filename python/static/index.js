@@ -1,7 +1,8 @@
 const xScale = d3.scaleLinear().domain([-1, 1024]);
 const yScale = d3.scaleLinear().domain([-1, 1024]);
 
-const series = fc.seriesCanvasPoint()
+//const series = fc.seriesCanvasPoint()
+const series = fc.seriesWebglPoint()
     .crossValue(d => d.x)
     .mainValue(d => d.y)
     .xScale(xScale)
@@ -9,12 +10,14 @@ const series = fc.seriesCanvasPoint()
     .type(d3.symbolCircle)
     .size(16);
 
-const multi = fc.seriesCanvasMulti()
+//const multi = fc.seriesCanvasMulti()
+const multi = fc.seriesWebglMulti()
     .series([series])
     .mapping(function(d,i,s) { return d.value; });
 
 const chart = fc.chartCartesian(xScale, yScale)
-    .canvasPlotArea(multi)
+    //.canvasPlotArea(multi)
+    .webglPlotArea(multi)
     .chartLabel(d => d.key)
     .xLabel('x axis')
     .yLabel('y axis')
@@ -49,4 +52,5 @@ d3.select(container)
 
 container.requestRedraw();
 
-setInterval(() => {container.requestRedraw();}, 100);
+//setInterval(() => {container.requestRedraw();}, 50);
+setInterval(() => {container.requestRedraw();});

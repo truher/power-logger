@@ -27,8 +27,8 @@ def data() -> Any:
     loads = ['load1','load2','load3','load4',
              'load5','load6','load7','load8']
     loadlist = [{'label':x,
-                 'x':rng.integers(1023,size=1000),
-                 'y':rng.integers(1023,size=1000)}
+                 'x':rng.integers(1023,size=100),
+                 'y':rng.integers(1023,size=100)}
                  for x in random.sample(loads, len(loads))]   
     # drop some rows to test the js rendering
     loadlist = loadlist[3:]
