@@ -1,12 +1,12 @@
-import numpy as np
-import pandas as pd
-import serial
-import sys
-import os
+import numpy as np #type:ignore
+import pandas as pd #type:ignore
+import serial #type:ignore
+import os, sys
 
 from datetime import datetime
 from glob import glob
-from scipy import integrate
+from scipy import integrate #type:ignore
+from typing import Any, Callable, Dict, IO, List, Union
 
 # frame so we can use "merge" to join for the load names
 loadsdf = pd.DataFrame(data={
@@ -20,7 +20,7 @@ loadsdf = pd.DataFrame(data={
                   'load5', 'load6', 'load7', 'load8']})
 
 # return (time, id, ct, measure)
-def read_raw_no_header(filename):
+def read_raw_no_header(filename:str) -> pd.DataFrame:
     if os.path.isfile(filename):
         return pd.read_csv(filename, delim_whitespace=True, comment='#',
                        index_col=0, parse_dates=True, header=0,
@@ -31,7 +31,7 @@ def read_raw_no_header(filename):
         return x
 
 # return (time, measure, load)
-def read_hourly_no_header(filename):
+def read_hourly_no_header(filename:str) -> pd.DataFrame:
     if os.path.isfile(filename):
         return pd.read_csv(filename, delim_whitespace=True, comment='#',
                        index_col=0, parse_dates=True, header=0,
@@ -42,7 +42,7 @@ def read_hourly_no_header(filename):
         return x
 
 # append a column for load name based on id and ct
-def resolve_name(raw_data):
+def resolve_name(raw_data:pd.DataFrame) -> pd.DataFrame:
     x = raw_data.reset_index().merge(loadsdf, on=['id','ct'])
     x.set_index(keys='time', inplace=True)
     x.sort_index(inplace=True)
@@ -51,7 +51,7 @@ def resolve_name(raw_data):
 # treat each load separately, then merge at the end
 # input (time, measure, load)
 # return (time, measure, load)
-def make_multi_hourly(load_data):
+def make_multi_hourly(load_data:pd.DataFrame) -> pd.DataFrame:
     hourly = pd.DataFrame(columns=['measure'])
     for load in list(set(load_data['load'])):
         hourly = hourly.append(
@@ -64,7 +64,7 @@ def make_multi_hourly(load_data):
 
 # accept (time, measure)
 # return (time (hour), measure (total))
-def make_hourly(raw_data):
+def make_hourly(raw_data:pd.DataFrame) -> pd.DataFrame:
     # provide a zero just before the first point, so integration sees
     # the first point but nothing before it
     raw_data = pd.concat(
@@ -108,8 +108,8 @@ def make_hourly(raw_data):
 
 # read a line from source, prepend timestamp, write it to sync
 # close the source if something goes wrong
-def transcribe(sink):
-    def f(source):
+def transcribe(sink:IO[str]) -> Callable[[IO[str]],None]:
+    def f(source:serial.Serial)->None:
         try:
             line = source.readline().rstrip().decode('ascii')
             if line:
@@ -121,7 +121,7 @@ def transcribe(sink):
     return f
 
 # trim file <filename> to latest <count> lines
-def trim(filename, count):
+def trim(filename:str, count:int) -> None:
     lines = []
     with open(filename, 'r') as source:
         lines = source.readlines()
@@ -130,9 +130,10 @@ def trim(filename, count):
         sink.writelines(lines)
 
 # return (time, id, ct, measure) from string
-def parse(line):
+# TODO: actually use this?
+def parse(line:str) -> Dict[str, Any]:
     try:
-        result = {}
+        result:Dict[str,Union[datetime, float, str]] = {}
         fields = line.split()
         if len(fields) != 4:
             raise ValueError(f'wrong field count: {line}')
@@ -156,29 +157,35 @@ def parse(line):
 
     except ValueError:
         print(f'ignore broken line: {line}', file=sys.stderr)
+        return {}
 
 # create new serial stream
-def new_serial(port):
+def new_serial(port:str) -> serial.Serial:
     print(f'new {port}', file=sys.stderr, flush=True)
     return serial.Serial(port, 9600, 8, 'N', 1, timeout=1)
 
-def is_open(ser):
+def is_open(ser:serial.Serial) -> bool:
     if ser.is_open:
         return True
     print(f'closed {ser.port}', file=sys.stderr, flush=True)
     return False
 
-def has_tty(ttys):
-    def f(ser):
+def has_tty(ttys:List[str]) -> Callable[[serial.Serial], bool]:
+    def f(ser:serial.Serial) -> bool:
         if ser.port in ttys:
             return True
         print(f'no tty {ser.port}', file=sys.stderr, flush=True)
         return False
     return f
 
-def no_serial(serials):
-    current_ports = [*map(lambda x: x.port, serials)]
-    def f(tty):
+# this is to make mypy happy
+def get_port(s:serial.Serial) -> str:
+    port:str = s.port
+    return port
+    
+def no_serial(serials:List[serial.Serial]) -> Callable[[str], bool]:
+    current_ports:List[str] = [*map(get_port , serials)]
+    def f(tty:str) -> bool:
         if tty in current_ports:
             return False
         print(f'no serial {tty}', file=sys.stderr, flush=True)
@@ -186,8 +193,8 @@ def no_serial(serials):
     return f
 
 # maintain connections and transcribe them all
-def transcribe_all(serials, sink):
-    ttys = glob("/dev/ttyACM*")
+def transcribe_all(serials:List[serial.Serial], sink:IO[str])-> List[serial.Serial]:
+    ttys:List[str] = glob("/dev/ttyACM*")
     serials = [*filter(lambda x: is_open(x) and has_tty(ttys)(x), serials)]
     serials.extend([*map(new_serial, filter(no_serial(serials), ttys))])
     [*map(transcribe(sink), serials)]

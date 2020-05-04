@@ -1,10 +1,11 @@
-import numpy as np
-import pandas as pd
+import numpy as np #type:ignore
+import pandas as pd #type:ignore
+import serial #type:ignore
 import csv, io, sys, threading, time, traceback, warnings
 from flask import Flask, Response, request, render_template_string
-from matplotlib.backends.backend_svg import FigureCanvasSVG
-from matplotlib.figure import Figure
-from waitress import serve
+from matplotlib.backends.backend_svg import FigureCanvasSVG #type:ignore
+from matplotlib.figure import Figure #type:ignore
+from waitress import serve #type:ignore
 import lib
 
 RAW_DATA_FILENAME = 'data_raw.csv'
@@ -12,7 +13,7 @@ HOURLY_DATA_FILENAME = 'data_hourly.csv'
 
 app = Flask(__name__)
 
-def plot_multi_raw_data(load_data, fig):
+def plot_multi_raw_data(load_data:pd.DataFrame, fig:Figure) -> None:
     loads = list(set(load_data['load']))
     loads.sort()
     ax = fig.add_subplot(4,1,1)
@@ -28,7 +29,7 @@ def plot_multi_raw_data(load_data, fig):
         )
     ax.legend(loads, loc='upper left')
 
-def plot_multi_rollups(hourly, fig):
+def plot_multi_rollups(hourly:pd.DataFrame, fig:Figure) -> None:
     right = min(pd.Timestamp.now(),hourly.index.max())
     loads = list(set(hourly['load']))
     loads.sort()
@@ -73,8 +74,8 @@ def plot_multi_rollups(hourly, fig):
     ax.legend(loads, loc='upper left')
 
 # continuously read serial inputs and write data to the raw data file 
-def data_reader():
-    serials = []
+def data_reader() -> None:
+    serials:serial.Serial = []
     # trim every 30 sec
     freq = 30
     # retain 15k rows (1 obs/sec, 3600 sec/h, 4h)
@@ -93,7 +94,7 @@ def data_reader():
                       sys.exc_info()[0], file=sys.stderr)
 
 # periodically read the raw file and update the hourly file
-def summarizer():
+def summarizer() -> None:
     while True:
         try:
             time.sleep(60)
@@ -127,7 +128,7 @@ def summarizer():
                   sys.exc_info()[0], file=sys.stderr)
 
 @app.route("/")
-def index():
+def index() -> str:
     fig = Figure(figsize=(10,15))
     fig.set_tight_layout(True) # Make sure the titles don't overlap
 
@@ -150,7 +151,7 @@ def index():
         {monthly_total.to_html(header=False)}
     """)
 
-def main():
+def main() -> None:
     warnings.filterwarnings('ignore')
     threading.Thread(target=data_reader).start()
     threading.Thread(target=summarizer).start()
