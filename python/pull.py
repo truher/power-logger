@@ -31,7 +31,7 @@ def data() -> Any:
                  'y':rng.integers(1023,size=100)}
                  for x in random.sample(loads, len(loads))]   
     # drop some rows to test the js rendering
-    loadlist = loadlist[3:]
+    #loadlist = loadlist[3:]
     json_payload = orjson.dumps(loadlist,
                                 option=orjson.OPT_SERIALIZE_NUMPY)
     return Response(json_payload, mimetype='application/json')
