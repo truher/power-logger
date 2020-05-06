@@ -95,6 +95,10 @@ sys.exit()
 
 
 
+
+
+
+
 raw_data = pd.read_csv('l3.csv', delim_whitespace=True, header=None,
                names=['time','err','id','ct','v_first','dv','a_first','da']) # type: pd.DataFrame
 print(raw_data)

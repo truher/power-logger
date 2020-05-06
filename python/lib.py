@@ -1,52 +1,57 @@
-import numpy as np #type:ignore
-import pandas as pd #type:ignore
+import numpy as np
+import pandas as pd
 import serial #type:ignore
-import os, sys
+import binascii, itertools, operator, os, sys
 
 from datetime import datetime
 from glob import glob
 from scipy import integrate #type:ignore
-from typing import Any, Callable, Dict, IO, List, Union
+from typing import Any, Callable, Dict, IO, List, Optional, Union
 
 # frame so we can use "merge" to join for the load names
 loadsdf = pd.DataFrame(data={
-          'id':["5737333034370D0E14", "5737333034370D0E14",
+          'id':["5737333034370D0E14", "5737333034370D0E14", #type:ignore
                 "5737333034370D0E14", "5737333034370D0E14",
                 "5737333034370A220D", "5737333034370A220D",
                 "5737333034370A220D", "5737333034370A220D"],
-          'ct':['ct1', 'ct2', 'ct3', 'ct4',
+          'ct':['ct1', 'ct2', 'ct3', 'ct4', #type:ignore
                 'ct1', 'ct2', 'ct3', 'ct4'],
-          'load':['load1', 'load2', 'load3', 'load4',
+          'load':['load1', 'load2', 'load3', 'load4', #type:ignore
                   'load5', 'load6', 'load7', 'load8']})
 
+# see arduino.ino
+# TODO: use a common format somehow?
+# TODO: use tab or space not both
+# input, tab/space delimited
+# time err uid ct v_first v_bytes a_first a_bytes
 # return (time, id, ct, measure)
 def read_raw_no_header(filename:str) -> pd.DataFrame:
     if os.path.isfile(filename):
-        return pd.read_csv(filename, delim_whitespace=True, comment='#',
+        return pd.read_csv(filename, delim_whitespace=True, comment='#', #type:ignore
                        index_col=0, parse_dates=True, header=0,
                        names=['time','id','ct','measure'])
     else:
         x = pd.DataFrame(columns=['time','id','ct','measure'])
-        x.set_index(keys='time', inplace=True)
+        x.set_index(keys='time', inplace=True) #type:ignore
         return x
 
 # return (time, measure, load)
 def read_hourly_no_header(filename:str) -> pd.DataFrame:
     if os.path.isfile(filename):
-        return pd.read_csv(filename, delim_whitespace=True, comment='#',
+        return pd.read_csv(filename, delim_whitespace=True, comment='#', #type:ignore
                        index_col=0, parse_dates=True, header=0,
                        names=['time','load','measure'])
     else:
         x = pd.DataFrame(columns=['time','load','measure'])
-        x.set_index(keys='time', inplace=True)
+        x.set_index(keys='time', inplace=True) #type:ignore
         return x
 
 # append a column for load name based on id and ct
 def resolve_name(raw_data:pd.DataFrame) -> pd.DataFrame:
-    x = raw_data.reset_index().merge(loadsdf, on=['id','ct'])
+    x = raw_data.reset_index().merge(loadsdf, on=['id','ct']) #type:ignore
     x.set_index(keys='time', inplace=True)
     x.sort_index(inplace=True)
-    return x
+    return x #type:ignore
 
 # treat each load separately, then merge at the end
 # input (time, measure, load)
@@ -56,10 +61,10 @@ def make_multi_hourly(load_data:pd.DataFrame) -> pd.DataFrame:
     for load in list(set(load_data['load'])):
         hourly = hourly.append(
             make_hourly(load_data[load_data['load']==load][['measure']])
-            .assign(load=load))
-    group = hourly.groupby(level=0).sum()
+            .assign(load=load)) #type:ignore
+    group = hourly.groupby(level=0).sum() #type:ignore
     hourly = hourly.append(group.assign(load='total'))
-    hourly = hourly.reindex(columns=['measure','load'])
+    hourly = hourly.reindex(columns=['measure','load']) #type:ignore
     return hourly
 
 # accept (time, measure)
@@ -69,27 +74,27 @@ def make_hourly(raw_data:pd.DataFrame) -> pd.DataFrame:
     # the first point but nothing before it
     raw_data = pd.concat(
         [pd.DataFrame(
-            index=[raw_data.index.min() - pd.DateOffset(seconds=1)],
+            index=[raw_data.index.min() - pd.DateOffset(seconds=1)], #type:ignore
             data=[0], columns=['measure']), raw_data])
-    raw_data.set_index(raw_data.index.rename('time'), inplace=True)
+    raw_data.set_index(raw_data.index.rename('time'), inplace=True) #type:ignore
 
     # Bucket boundaries we want, with some left padding to be sure we
     # can set the first to zero
     buckets = pd.DataFrame(
-        pd.date_range(
-            start=raw_data.index.min().floor('H') - pd.DateOffset(hours=1),
-            end=raw_data.index.max().ceil('H'), freq='H')
-        ).set_index(0)
+        pd.date_range( #type:ignore
+            start=raw_data.index.min().floor('H') - pd.DateOffset(hours=1), #type:ignore
+            end=raw_data.index.max().ceil('H'), freq='H') #type:ignore
+        ).set_index(0) #type:ignore
 
     # Insert bucket boundaries into the raw dataset (they'll have NaN
     # measures)
-    raw_data_with_buckets = raw_data.append(buckets).sort_index()
+    raw_data_with_buckets = raw_data.append(buckets).sort_index() #type:ignore
 
     # Set the left edge to zero
-    raw_data_with_buckets.at[raw_data_with_buckets.index.min()]=0
+    raw_data_with_buckets.at[raw_data_with_buckets.index.min()]=0 #type:ignore
 
     # Fill interpolated values at the bucket boundaries
-    interpolated = raw_data_with_buckets.interpolate(method='time',
+    interpolated = raw_data_with_buckets.interpolate(method='time', #type:ignore
         limit_area='inside').dropna()
 
     # Integrate the data series to get cumulative energy (kWh)
@@ -98,17 +103,17 @@ def make_hourly(raw_data:pd.DataFrame) -> pd.DataFrame:
         data=integrate.cumtrapz(
             interpolated['measure'],
             x=interpolated.index, initial=0)
-        / (1000 * np.timedelta64(1, 'h')))
+        / (1000 * np.timedelta64(1, 'h'))) #type:ignore
 
     # Downsample to the buckets, diff to get energy per bucket, trim
     # the leading zero
-    hourly = cum_kwh.resample(rule='H',closed='right',label='right',
+    hourly = cum_kwh.resample(rule='H',closed='right',label='right', #type:ignore
         loffset='-1H').max().diff().dropna().iloc[1:]
-    return hourly
+    return hourly #type:ignore
 
-# read a line from source, prepend timestamp, write it to sync
+# read a line from source (unparsed), prepend timestamp, write it to sink
 # close the source if something goes wrong
-def transcribe(sink:IO[str]) -> Callable[[IO[str]],None]:
+def transcribe(sink:IO[str]) -> Callable[[IO[bytes]],None]:
     def f(source:serial.Serial)->None:
         try:
             line = source.readline().rstrip().decode('ascii')
@@ -131,7 +136,7 @@ def trim(filename:str, count:int) -> None:
 
 # return (time, id, ct, measure) from string
 # TODO: actually use this?
-def parse(line:str) -> Dict[str, Any]:
+def parse(line:str) -> Optional[Dict[str, Any]]:
     try:
         result:Dict[str,Union[datetime, float, str]] = {}
         fields = line.split()
@@ -157,7 +162,7 @@ def parse(line:str) -> Dict[str, Any]:
 
     except ValueError:
         print(f'ignore broken line: {line}', file=sys.stderr)
-        return {}
+        return None
 
 # create new serial stream
 def new_serial(port:str) -> serial.Serial:
@@ -199,3 +204,55 @@ def transcribe_all(serials:List[serial.Serial], sink:IO[str])-> List[serial.Seri
     serials.extend([*map(new_serial, filter(no_serial(serials), ttys))])
     [*map(transcribe(sink), serials)]
     return serials
+
+def readfile(filename:str) -> List[bytes]:
+    with open(filename, 'rb') as datafile: # type: IO[bytes]
+        return datafile.readlines()
+
+def read_new_raw(filename:str) -> Any:
+    return ['foo']
+
+# avoid creating the bases for every row, create it once
+def interpolator(samples:int) -> Callable[[List[int]], List[int]]:
+    # x vals for observations
+    interp_xp = np.linspace(0, samples - 1, samples)
+    # x vals for interpolations, adds in-between vals
+    interp_x = np.linspace(0, samples - 1, 2 * samples - 1)
+    def f(cumulative:List[int]) -> List[int]:
+        return np.interp(interp_x, interp_xp, cumulative) #type:ignore
+    return f
+
+# interpret one row
+def bytes_to_array(interpolator:Callable[[List[int]],List[int]],
+                   all_fields:List[bytes], data_col:int, first_col:int,
+                   trim_first:bool ) -> Any:
+    try:
+        field = all_fields[data_col]
+        decoded = binascii.unhexlify(field)
+        first = int(all_fields[first_col])
+        offsetted = (y-128 for y in decoded)
+        cumulative = list(itertools.accumulate(offsetted, func=operator.add, initial=first))
+        # TODO: stop encoding the first delta as zero
+        cumulative.pop(0)
+        interpolated = interpolator(cumulative)
+        if trim_first:
+            interpolated = interpolated[1:]
+        else:
+            interpolated = interpolated[:-1]
+        return interpolated
+    except (IndexError, TypeError, ValueError) as error:
+        print(error)
+        print(f'ignore broken line: {all_fields}', file=sys.stderr)
+        return None
+
+def goodrow(x:List[bytes]) -> bool:
+    if x is None:
+        print(f'skip empty row')
+        return False
+    if len(x) != 8:
+        print(f'skip row len {len(x)}')
+        return False
+    if x[1] != b'0':
+        print(f'skip row err {x[1]!r}')
+        return False
+    return True
