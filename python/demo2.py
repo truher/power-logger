@@ -9,10 +9,9 @@ from numpy import timedelta64 as np_timedelta64
 from pandas import to_numeric as pd_to_numeric
 from pandas import to_timedelta as pd_to_timedelta
 from typing import List,Any,Tuple,IO,Iterable
-import binascii
-import itertools
-import operator
+
 import sys
+import lib
 
 pd.set_option('display.max_columns', 20)
 pd.set_option('display.width', 2000)
@@ -21,67 +20,36 @@ pd.set_option('max_seq_item', 10)
 pd.set_option('display.min_rows', 20)
 pd.set_option('display.max_rows', 40)
 
+# from arduino
+OBSERVATION_COUNT = 1000
+
 # return time series for N observations, counting back
 # from T (string) by DT (us) interval.
 def timeseries(n:int, t:str, dt:int) -> List[str]:
     t_datetime = pd_to_datetime(t)
     return [t_datetime - np_timedelta64(x, 'us') for x in range(0, n, dt)]
 
-def readfile() -> List[bytes]:
-    with open('l3.csv', 'rb') as datafile: # type: IO[bytes]
-        return datafile.readlines()
-
-def goodrow(x:List[bytes]) -> bool:
-    if len(x) != 8:
-        print(f'skip row len {len(x)}')
-        return False
-    if x[1] != b'0':
-        print(f'skip row err {x[1]!r}')
-        return False
-    return True
-
-def d(x:int) -> int:
-    return x-128
-
-# from arduino
-OBSERVATION_COUNT = 1000
-# x vals for observations
-interp_xp = np.linspace(0, OBSERVATION_COUNT - 1, OBSERVATION_COUNT)
-# x vals for interpolations, adds in-between vals
-interp_x = np.linspace(0, OBSERVATION_COUNT - 1, 2 * OBSERVATION_COUNT - 1)
-
-def bytes_to_array(all_fields:List[bytes], data_col:int, first_col:int, trim_first:bool ) -> Any:
-    field = all_fields[data_col]
-    decoded = binascii.unhexlify(field)
-    first = int(all_fields[first_col])
-    offsetted = (y-128 for y in decoded)
-    #cumulative = itertools.accumulate(offsetted, func=operator.add, initial=first)
-    cumulative = list(itertools.accumulate(offsetted, func=operator.add, initial=first))
-    # TODO: stop encoding the first delta as zero
-    #cumulative = list(itertools.islice(cumulative, 1, None))
-    cumulative.pop(0)
-    interpolated = np.interp(interp_x, interp_xp, cumulative)
-    if trim_first:
-        interpolated = interpolated[1:]
-    else:
-        interpolated = interpolated[:-1]
-    return interpolated
-
-#def cume():
-    #return list(itertools.accumulate(decoded_fromhex))
 
 # read file, ~100 us
-allrows = readfile() # type: List[bytes]
-allrowsfields = [x.split() for x in allrows]
+allrows:List[bytes] = lib.readfile('l3.csv')
+allrowsfields:List[List[bytes]] = [x.split() for x in allrows]
 
 # remove bad rows, ~25 us
-allrowsfields = [x for x in allrowsfields if goodrow(x)]
+allrowsfields = [x for x in allrowsfields if lib.goodrow(x)]
+interpolator = lib.interpolator(OBSERVATION_COUNT)
 
 # volts is the first observation, so trim the first value
-vbs = [bytes_to_array(x,5,4,True) for x in allrowsfields]
+vbs = [lib.bytes_to_array(interpolator,x,5,4,True) for x in allrowsfields]
+# interpreter can barf, skip those rows
+# TODO: avoid this copy, it takes 23us
+vbs = [z for z in vbs if z is not None]
 
 # amps is the second observation, so trim the last value
-abs_ = [bytes_to_array(x,7,6,False) for x in allrowsfields]
+abs_ = [lib.bytes_to_array(interpolator,x,7,6,False) for x in allrowsfields]
+# interpreter can barf, skip those rows
+# TODO: avoid this copy, it takes 23us
+abs_ = [z for z in abs_ if z is not None]
+
 
 print(len(vbs[20]))
 print(vbs[20])

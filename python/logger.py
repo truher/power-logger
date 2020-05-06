@@ -74,6 +74,7 @@ def plot_multi_rollups(hourly:pd.DataFrame, fig:Figure) -> None:
     ax.legend(loads, loc='upper left')
 
 # continuously read serial inputs and write data to the raw data file 
+# TODO: move to lib
 def data_reader() -> None:
     serials:serial.Serial = []
     # trim every 30 sec
@@ -127,8 +128,13 @@ def summarizer() -> None:
             print("top level exception",
                   sys.exc_info()[0], file=sys.stderr)
 
-@app.route("/")
-def index() -> str:
+@app.route('/')
+def index() -> Any:
+    print('index')
+    return app.send_static_file('logger.html')
+
+#@app.route("/")
+def index2() -> str:
     fig = Figure(figsize=(10,15))
     fig.set_tight_layout(True) # Make sure the titles don't overlap
 
