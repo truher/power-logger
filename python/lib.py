@@ -113,12 +113,11 @@ def make_hourly(raw_data:pd.DataFrame) -> pd.DataFrame:
     return hourly #type:ignore
 
 # in order to pass null
-VA = namedtuple('VA', ['volts','amps'])   
+VA = namedtuple('VA', ['load','volts','amps'])   
 
 # read a line from source (unparsed), prepend timestamp, write it to sink
 # close the source if something goes wrong
 # so now the raw data is not worth keeping
-# so 
 def transcribe(sink:IO[bytes], interpolator:Callable[[List[int]],List[int]],
                va_updater:Callable[[VA], None]) -> Callable[[IO[bytes]],None]:
     def f(source:serial.Serial)->None:
@@ -303,6 +302,28 @@ def goodrow(x:List[bytes]) -> bool:
         return False
     return True
 
+loadnames = {b"5737333034370D0E14ct1":b'load1',
+             b"5737333034370D0E14ct2":b'load2',
+             b"5737333034370D0E14ct3":b'load3',
+             b"5737333034370D0E14ct4":b'load4',
+             b"5701333034370A220Dct1":b'load5',
+             b"5701333034370A220Dct2":b'load6',
+             b"5701333034370A220Dct3":b'load7',
+             b"5701333034370A220Dct4":b'load8'}
+
+# extract name from a row
+# TODO: change to new format
+def load(x:List[bytes]) -> bytes:
+    id = x[2]
+    ct = x[3]
+    #print("id")
+    #print(id)
+    #print("ct")
+    #print(ct)
+    #print("id+ct")
+    #print(id+ct)
+    return loadnames[id+ct]
+
 
 # input: one raw row from arduino, WITHOUT the time stamp
 # TODO actually fix it to not use timestamp
@@ -311,11 +332,15 @@ def decode_and_interpolate(interpolator:Callable[[List[int]],List[int]],
                            line:bytes) -> Optional[VA]:
     #######print("interp")
     #######print(type(line))
-    #######print(line)
+    #print(line)
     fields = line.split()
 
     if not goodrow(fields):
         return None # skip obviously bad rows
+
+    load_name = load(fields)
+    #print("load_name")
+    #print(load_name)
 
     #######print("interp2")
 
@@ -330,7 +355,7 @@ def decode_and_interpolate(interpolator:Callable[[List[int]],List[int]],
     if amps is None:
         return None # skip uninterpretable rows
 
-    return VA(volts, amps)
+    return VA(load_name,volts, amps)
 
 # input: observations (volts, amps)
 # output: average power in watts

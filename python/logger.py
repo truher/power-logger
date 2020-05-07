@@ -80,14 +80,25 @@ OBSERVATION_COUNT = 1000
 interpolator = lib.interpolator(OBSERVATION_COUNT)
 
 #latest_va = lib.VA(rng.integers(1023,size=100), rng.integers(1023,size=100))
-latest_va = {'x':rng.integers(1023,size=100),
-             'y': rng.integers(1023,size=100)}
+randxy = {'x':rng.integers(1023,size=100), 'y': rng.integers(1023,size=100)}
+
+latest_va = {'load1': randxy,
+             'load2': randxy,
+             'load3': randxy,
+             'load4': randxy,
+             'load5': randxy,
+             'load6': randxy,
+             'load7': randxy,
+             'load8': randxy}
 
 def va_updater(va:lib.VA) -> None:
-    #print("update")
     #print(va)
-    latest_va['x'] = va.volts
-    latest_va['y'] = va.amps
+    loadname = va.load.decode('ascii')
+    print(f"update {loadname}")
+    if va.load not in latest_va:
+        latest_va[loadname] = {'x':[],'y':[]}
+    latest_va[loadname]['x'] = va.volts
+    latest_va[loadname]['y'] = va.amps
 
 
 # continuously read serial inputs and write data to the raw data file 
@@ -162,10 +173,11 @@ def data() -> Any:
     #print(latest_va)
     loads = ['load1','load2','load3','load4',
              'load5','load6','load7','load8']
-    loadlist = [{'label':x,
-                 'x':latest_va['x'],
-                 'y':latest_va['y']}
-                 for x in random.sample(loads, len(loads))]   
+    loadlist = [{'label':load,
+                 'x':latest_va[load]['x'],
+                 'y':latest_va[load]['y']}
+                 for load in latest_va.keys()]   
+                 #for load in random.sample(loads, len(loads))]   
     # drop some rows to test the js rendering
     #loadlist = loadlist[3:]
     json_payload = orjson.dumps(loadlist,
