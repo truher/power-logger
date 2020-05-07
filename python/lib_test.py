@@ -1,6 +1,5 @@
-import io
-import lib
-import unittest
+import io, lib, unittest
+import numpy as np
 from typing import List
 
 # show how to do a unittest of a naked function
@@ -124,6 +123,49 @@ class TestLib(unittest.TestCase):
         self.assertFalse(lib.goodrow([b'1',b'2',b'3',b'4',b'5',b'6',b'7',b'8']))
         # error col zero => good
         self.assertTrue(lib.goodrow([b'1',b'0',b'3',b'4',b'5',b'6',b'7',b'8']))
+
+    def test_decode_and_interpolate(self) -> None:
+        i = lib.interpolator(5)
+        # volts: 10 11 12 13 14
+        # amps:  20 21 22 23 24
+        # interpolation (volts is first):
+        # volts: 10.0      11.0      12.0      13.0      14.0
+        # amps:       20.0      21.0      22.0      23.0      24.0
+        # interpolated:
+        # volts: 10.0 10.5 11.0 11.5 12.0 12.5 13.0 13.5 14.0
+        # amps:       20.0 20.5 21.0 21.5 22.0 22.5 23.0 23.5 24.0
+        # trimmed:
+        # volts:      10.5 11.0 11.5 12.0 12.5 13.0 13.5 14.0
+        # amps:       20.0 20.5 21.0 21.5 22.0 22.5 23.0 23.5
+        # 
+        va = lib.decode_and_interpolate(i, b'x 0 x x 10 8081818181 20 8081818181')
+        self.assertIsNotNone(va)
+        if va is not None: # this is for mypy
+            self.assertEqual(8, len(va.volts))
+            self.assertEqual(8, len(va.amps))
+            self.assertCountEqual([10.5,11.0,11.5,12.0,12.5,13.0,13.5,14.0], va.volts)
+            self.assertCountEqual([20.0,20.5,21.0,21.5,22.0,22.5,23.0,23.5], va.amps)
+
+    def test_average_power_watts(self) -> None:
+        # one constant volt * one constant amp = one constant watt
+        pwr = lib.average_power_watts([1], [1])
+        self.assertEqual(1, pwr)
+
+        # one volt AC * one amp AC = 0.5W
+        # (max amplitude, not RMS)
+        pwrp = lib.average_power_watts(np.sin(np.linspace(0,999,1000)), #type:ignore
+                                       np.sin(np.linspace(0,999,1000))) #type:ignore
+        self.assertAlmostEqual(0.5, pwrp, places=3)
+
+    def test_interpolation_and_power(self) -> None:
+        i = lib.interpolator(5)
+        # same as above
+        va = lib.decode_and_interpolate(i, b'x 0 x x 10 8081818181 20 8081818181')
+        self.assertIsNotNone(va)
+        if va is not None: # this is for mypy
+            pwr = lib.average_power_watts(va.volts, va.amps)
+            self.assertAlmostEqual(267.75, pwr, places=3)
+  
 
 
 if __name__ == '__main__':

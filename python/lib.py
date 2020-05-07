@@ -6,7 +6,8 @@ import binascii, itertools, operator, os, sys
 from datetime import datetime
 from glob import glob
 from scipy import integrate #type:ignore
-from typing import Any, Callable, Dict, IO, List, Optional, Union
+from typing import Any, Callable, Dict, IO, List, Optional, Tuple, Union
+from collections import namedtuple
 
 # frame so we can use "merge" to join for the load names
 loadsdf = pd.DataFrame(data={
@@ -205,6 +206,7 @@ def transcribe_all(serials:List[serial.Serial], sink:IO[str])-> List[serial.Seri
     [*map(transcribe(sink), serials)]
     return serials
 
+# read the whole file into a list of lines
 def readfile(filename:str) -> List[bytes]:
     with open(filename, 'rb') as datafile: # type: IO[bytes]
         return datafile.readlines()
@@ -245,6 +247,7 @@ def bytes_to_array(interpolator:Callable[[List[int]],List[int]],
         print(f'ignore broken line: {all_fields}', file=sys.stderr)
         return None
 
+# input: fields from arduino, WITHOUT the time stamp
 def goodrow(x:List[bytes]) -> bool:
     if x is None:
         print(f'skip empty row')
@@ -256,3 +259,34 @@ def goodrow(x:List[bytes]) -> bool:
         print(f'skip row err {x[1]!r}')
         return False
     return True
+
+# in order to pass null
+VA = namedtuple('VA', ['volts','amps'])   
+
+# input: one raw row from arduino, WITHOUT the time stamp
+# TODO actually fix it to not use timestamp
+# output: (volts[], amps[]) to suit VI plots, or None, for invalid row
+def decode_and_interpolate(interpolator:Callable[[List[int]],List[int]],
+                           line:bytes) -> Optional[VA]:
+    fields = line.split()
+
+    if not goodrow(fields):
+        return None # skip obviously bad rows
+
+    # volts is the first observation, so trim the first value
+    volts:List[int] = bytes_to_array(interpolator,fields,5,4,True)
+    if volts is None:
+        return None
+        # skip uninterpretable rows
+
+    # amps is the second observation, so trim the last value
+    amps:List[int] = bytes_to_array(interpolator,fields,7,6,False)
+    if amps is None:
+        return None # skip uninterpretable rows
+
+    return VA(volts, amps)
+
+# input: observations (volts, amps)
+# output: average power in watts
+def average_power_watts(volts: List[int], amps: List[int]) -> int:
+    return np.average(np.multiply(volts, amps)) #type:ignore

@@ -22,38 +22,21 @@ pd.set_option('display.max_rows', 40)
 
 # from arduino
 OBSERVATION_COUNT = 1000
-
-# return time series for N observations, counting back
-# from T (string) by DT (us) interval.
-def timeseries(n:int, t:str, dt:int) -> List[str]:
-    t_datetime = pd_to_datetime(t)
-    return [t_datetime - np_timedelta64(x, 'us') for x in range(0, n, dt)]
-
-
-# read file, ~100 us
-allrows:List[bytes] = lib.readfile('l3.csv')
-allrowsfields:List[List[bytes]] = [x.split() for x in allrows]
-
-# remove bad rows, ~25 us
-allrowsfields = [x for x in allrowsfields if lib.goodrow(x)]
 interpolator = lib.interpolator(OBSERVATION_COUNT)
 
-# volts is the first observation, so trim the first value
-vbs = [lib.bytes_to_array(interpolator,x,5,4,True) for x in allrowsfields]
-# interpreter can barf, skip those rows
-# TODO: avoid this copy, it takes 23us
-vbs = [z for z in vbs if z is not None]
+# ~1 us per row
+# read the whole file into a list of lines
+# each line is what arduino makes, prepended with time
+allrows:List[bytes] = lib.readfile('l3.csv')
 
-# amps is the second observation, so trim the last value
-abs_ = [lib.bytes_to_array(interpolator,x,7,6,False) for x in allrowsfields]
-# interpreter can barf, skip those rows
-# TODO: avoid this copy, it takes 23us
-abs_ = [z for z in abs_ if z is not None]
+# generator for v/a series
+va = (lib.decode_and_interpolate(interpolator, x) for x in allrows)
+va = (x for x in va if x is not None)
 
-
-print(len(vbs[20]))
-print(vbs[20])
-plt.plot(vbs[20],abs_[20])
+valist = list(va)
+vbs = valist[20].volts
+abs_ = valist[20].amps
+plt.plot(vbs,abs_)
 plt.show()
 
 sys.exit()
