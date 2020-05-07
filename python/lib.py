@@ -112,15 +112,40 @@ def make_hourly(raw_data:pd.DataFrame) -> pd.DataFrame:
         loffset='-1H').max().diff().dropna().iloc[1:]
     return hourly #type:ignore
 
+# in order to pass null
+VA = namedtuple('VA', ['volts','amps'])   
+
 # read a line from source (unparsed), prepend timestamp, write it to sink
 # close the source if something goes wrong
-def transcribe(sink:IO[str]) -> Callable[[IO[bytes]],None]:
+# so now the raw data is not worth keeping
+# so 
+def transcribe(sink:IO[bytes], interpolator:Callable[[List[int]],List[int]],
+               va_updater:Callable[[VA], None]) -> Callable[[IO[bytes]],None]:
     def f(source:serial.Serial)->None:
         try:
-            line = source.readline().rstrip().decode('ascii')
+            #line = source.readline().rstrip().decode('ascii')
+            line = source.readline().rstrip()
             if line:
-                now = datetime.now().isoformat(timespec='microseconds')
-                print(f'{now} {line}', file=sink, flush=True)
+                #print(type(line))
+                #print("line")
+                #print(line)
+                #now = datetime.now().isoformat(timespec='microseconds')
+                now = datetime.now().isoformat(timespec='microseconds').encode('ascii')
+                #old_format_line = f'{now} {line}'
+                old_format_line = now + b' ' + line
+                #print("old_format_line")
+                sink.write(old_format_line)
+                sink.write(b'\n')
+                sink.flush()
+                #print(old_format_line, file=sink, flush=True)
+                #print(type(old_format_line))
+                #print(old_format_line)
+                # also interpret the line
+                # TODO fix the format
+                va = decode_and_interpolate(interpolator, old_format_line)
+                if va:
+                    # TODO per-load update
+                    va_updater(va)
         except serial.serialutil.SerialException:
             print("fail", source.port, file=sys.stderr)
             source.close()
@@ -129,10 +154,10 @@ def transcribe(sink:IO[str]) -> Callable[[IO[bytes]],None]:
 # trim file <filename> to latest <count> lines
 def trim(filename:str, count:int) -> None:
     lines = []
-    with open(filename, 'r') as source:
+    with open(filename, 'rb') as source:
         lines = source.readlines()
     lines = lines[-count:]
-    with open(filename, 'w') as sink:
+    with open(filename, 'wb') as sink:
         sink.writelines(lines)
 
 # return (time, id, ct, measure) from string
@@ -199,11 +224,14 @@ def no_serial(serials:List[serial.Serial]) -> Callable[[str], bool]:
     return f
 
 # maintain connections and transcribe them all
-def transcribe_all(serials:List[serial.Serial], sink:IO[str])-> List[serial.Serial]:
+# TODO: stop constructing the transcriber every time, pass it in.
+# TODO: test this
+def transcribe_all(serials:List[serial.Serial],
+        transcriber: Callable[[IO[bytes]],None])-> List[serial.Serial]:
     ttys:List[str] = glob("/dev/ttyACM*")
     serials = [*filter(lambda x: is_open(x) and has_tty(ttys)(x), serials)]
     serials.extend([*map(new_serial, filter(no_serial(serials), ttys))])
-    [*map(transcribe(sink), serials)]
+    [*map(transcriber, serials)]
     return serials
 
 # read the whole file into a list of lines
@@ -216,11 +244,15 @@ def read_new_raw(filename:str) -> Any:
 
 # avoid creating the bases for every row, create it once
 def interpolator(samples:int) -> Callable[[List[int]], List[int]]:
+    #print("interpolator0")
     # x vals for observations
     interp_xp = np.linspace(0, samples - 1, samples)
+    #print("interpolator1")
     # x vals for interpolations, adds in-between vals
     interp_x = np.linspace(0, samples - 1, 2 * samples - 1)
+    #print("interpolator2")
     def f(cumulative:List[int]) -> List[int]:
+        #print("interpolator3")
         return np.interp(interp_x, interp_xp, cumulative) #type:ignore
     return f
 
@@ -228,13 +260,22 @@ def interpolator(samples:int) -> Callable[[List[int]], List[int]]:
 def bytes_to_array(interpolator:Callable[[List[int]],List[int]],
                    all_fields:List[bytes], data_col:int, first_col:int,
                    trim_first:bool ) -> Any:
+    ########print("type(all_fields)")
+    #######print(type(all_fields))
+    #######print(all_fields)
     try:
+        #######print("b0")
         field = all_fields[data_col]
+        #######print("b1")
         decoded = binascii.unhexlify(field)
+        #######print("b2")
         first = int(all_fields[first_col])
+        #######print("b3")
         offsetted = (y-128 for y in decoded)
+        #######print("b4")
         cumulative = list(itertools.accumulate(offsetted, func=operator.add, initial=first))
         # TODO: stop encoding the first delta as zero
+        #######print("b5")
         cumulative.pop(0)
         interpolated = interpolator(cumulative)
         if trim_first:
@@ -249,29 +290,34 @@ def bytes_to_array(interpolator:Callable[[List[int]],List[int]],
 
 # input: fields from arduino, WITHOUT the time stamp
 def goodrow(x:List[bytes]) -> bool:
+    #######print("goodrow")
     if x is None:
         print(f'skip empty row')
         return False
     if len(x) != 8:
         print(f'skip row len {len(x)}')
         return False
+    #######print(type(x[1]))
     if x[1] != b'0':
         print(f'skip row err {x[1]!r}')
         return False
     return True
 
-# in order to pass null
-VA = namedtuple('VA', ['volts','amps'])   
 
 # input: one raw row from arduino, WITHOUT the time stamp
 # TODO actually fix it to not use timestamp
 # output: (volts[], amps[]) to suit VI plots, or None, for invalid row
 def decode_and_interpolate(interpolator:Callable[[List[int]],List[int]],
                            line:bytes) -> Optional[VA]:
+    #######print("interp")
+    #######print(type(line))
+    #######print(line)
     fields = line.split()
 
     if not goodrow(fields):
         return None # skip obviously bad rows
+
+    #######print("interp2")
 
     # volts is the first observation, so trim the first value
     volts:List[int] = bytes_to_array(interpolator,fields,5,4,True)

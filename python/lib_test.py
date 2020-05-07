@@ -1,6 +1,6 @@
 import io, lib, unittest
 import numpy as np
-from typing import List
+from typing import IO,List
 
 # show how to do a unittest of a naked function
 
@@ -20,13 +20,20 @@ class TestLib(unittest.TestCase):
         self.assertEqual("xyz", x['ct']) #type:ignore
         self.assertAlmostEqual(1.0, x['measure'], 3) #type:ignore
 
+
     def test_transcribe(self) -> None:
-        sink = io.StringIO()
-        source = io.BytesIO(b"asdf\n")
-        f = lib.transcribe(sink)
+        def v(va:lib.VA) -> None:
+            pass
+        #sink = io.StringIO()
+        sink = io.BytesIO()
+        i = lib.interpolator(5)
+        f = lib.transcribe(sink, i, v)
+        source:IO[bytes] = io.BytesIO(b"asdf\n")
         f(source)
-        content = sink.getvalue()
-        self.assertEqual("asdf\n", content[-5:])
+        content:bytes = sink.getvalue()
+        print("CONTENT")
+        print(content)
+        self.assertEqual(b"asdf\n", content[-5:])
 
     def test_io_write_str(self) -> None:
         output = io.StringIO()
@@ -140,7 +147,7 @@ class TestLib(unittest.TestCase):
         # 
         va = lib.decode_and_interpolate(i, b'x 0 x x 10 8081818181 20 8081818181')
         self.assertIsNotNone(va)
-        if va is not None: # this is for mypy
+        if va: # this is for mypy
             self.assertEqual(8, len(va.volts))
             self.assertEqual(8, len(va.amps))
             self.assertCountEqual([10.5,11.0,11.5,12.0,12.5,13.0,13.5,14.0], va.volts)
@@ -162,7 +169,7 @@ class TestLib(unittest.TestCase):
         # same as above
         va = lib.decode_and_interpolate(i, b'x 0 x x 10 8081818181 20 8081818181')
         self.assertIsNotNone(va)
-        if va is not None: # this is for mypy
+        if va: # this is for mypy
             pwr = lib.average_power_watts(va.volts, va.amps)
             self.assertAlmostEqual(267.75, pwr, places=3)
   

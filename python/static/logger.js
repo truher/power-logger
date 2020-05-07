@@ -49,4 +49,4 @@ d3.select(container)
 
 container.requestRedraw();
 
-setInterval(() => {container.requestRedraw();}, 250);
+setInterval(() => {container.requestRedraw();}, 50);

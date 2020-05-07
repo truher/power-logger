@@ -1,17 +1,20 @@
 import numpy as np #type:ignore
 import pandas as pd #type:ignore
 import serial #type:ignore
-import csv, io, sys, threading, time, traceback, warnings
+import csv, io, orjson, random, sys, threading, time, traceback, warnings
 from flask import Flask, Response, request, render_template_string
 from matplotlib.backends.backend_svg import FigureCanvasSVG #type:ignore
 from matplotlib.figure import Figure #type:ignore
 from waitress import serve #type:ignore
+from typing import Any
 import lib
 
 RAW_DATA_FILENAME = 'data_raw.csv'
 HOURLY_DATA_FILENAME = 'data_hourly.csv'
 
 app = Flask(__name__)
+# TODO: remove this
+rng = np.random.default_rng()
 
 def plot_multi_raw_data(load_data:pd.DataFrame, fig:Figure) -> None:
     loads = list(set(load_data['load']))
@@ -73,10 +76,26 @@ def plot_multi_rollups(hourly:pd.DataFrame, fig:Figure) -> None:
         )
     ax.legend(loads, loc='upper left')
 
+OBSERVATION_COUNT = 1000
+interpolator = lib.interpolator(OBSERVATION_COUNT)
+
+#latest_va = lib.VA(rng.integers(1023,size=100), rng.integers(1023,size=100))
+latest_va = {'x':rng.integers(1023,size=100),
+             'y': rng.integers(1023,size=100)}
+
+def va_updater(va:lib.VA) -> None:
+    #print("update")
+    #print(va)
+    latest_va['x'] = va.volts
+    latest_va['y'] = va.amps
+
+
 # continuously read serial inputs and write data to the raw data file 
 # TODO: move to lib
 def data_reader() -> None:
     serials:serial.Serial = []
+    # TODO: make this a circular mmapped buffer
+    # to avoid the pause for trimming
     # trim every 30 sec
     freq = 30
     # retain 15k rows (1 obs/sec, 3600 sec/h, 4h)
@@ -84,9 +103,11 @@ def data_reader() -> None:
     while True:
         try:
             # write <freq> lines
-            with open(RAW_DATA_FILENAME, 'a') as sink:
+            # binary?
+            with open(RAW_DATA_FILENAME, 'ab') as sink:
+                transcriber = lib.transcribe(sink, interpolator, va_updater)
                 for lines in range(freq):
-                    serials = lib.transcribe_all(serials, sink)
+                    serials = lib.transcribe_all(serials, transcriber)
             # trim the file
             lib.trim(RAW_DATA_FILENAME, size) 
         except:
@@ -132,6 +153,24 @@ def summarizer() -> None:
 def index() -> Any:
     print('index')
     return app.send_static_file('logger.html')
+
+
+
+@app.route('/data')
+def data() -> Any:
+    print('data')
+    #print(latest_va)
+    loads = ['load1','load2','load3','load4',
+             'load5','load6','load7','load8']
+    loadlist = [{'label':x,
+                 'x':latest_va['x'],
+                 'y':latest_va['y']}
+                 for x in random.sample(loads, len(loads))]   
+    # drop some rows to test the js rendering
+    #loadlist = loadlist[3:]
+    json_payload = orjson.dumps(loadlist,
+                                option=orjson.OPT_SERIALIZE_NUMPY)
+    return Response(json_payload, mimetype='application/json')
 
 #@app.route("/")
 def index2() -> str:
