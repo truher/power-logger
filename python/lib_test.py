@@ -28,12 +28,10 @@ class TestLib(unittest.TestCase):
         sink = io.BytesIO()
         i = lib.interpolator(5)
         f = lib.transcribe(sink, i, v)
-        source:IO[bytes] = io.BytesIO(b"asdf\n")
+        source:IO[bytes] = io.BytesIO(b'0 5701333034370A220D ct1 10 8081818181 20 8081818181')
         f(source)
         content:bytes = sink.getvalue()
-        print("CONTENT")
-        print(content)
-        self.assertEqual(b"asdf\n", content[-5:])
+        self.assertEqual(b"load5\t267.75\n", content[-13:])
 
     def test_io_write_str(self) -> None:
         output = io.StringIO()
@@ -64,25 +62,20 @@ class TestLib(unittest.TestCase):
     def test_read_raw_no_header(self) -> None:
         raw_data = lib.read_raw_no_header('test_data_multi.csv')
         self.assertEqual(24, len(raw_data))
-        self.assertCountEqual(['id','ct','measure'], list(raw_data.columns))
-        raw_data = lib.read_raw_no_header('test_data_long.csv')
-        self.assertEqual(24112, len(raw_data))
-        self.assertCountEqual(['id','ct','measure'], list(raw_data.columns))
+        self.assertCountEqual(['load','measure'], list(raw_data.columns))
 
-    def test_resolve_name(self) -> None:
-        raw_data = lib.read_raw_no_header('test_data_multi.csv')
-        load_data = lib.resolve_name(raw_data)
-        self.assertEqual(24, len(load_data))
+#######    def test_resolve_name(self) -> None:
+#######        raw_data = lib.read_raw_no_header('test_data_multi.csv')
+#######        load_data = lib.resolve_name(raw_data)
+#######        self.assertEqual(24, len(load_data))
 
     def test_make_multi_hourly(self) -> None:
-        raw_data = lib.read_raw_no_header('test_data_multi.csv')
-        load_data = lib.resolve_name(raw_data)
+        load_data = lib.read_raw_no_header('test_data_multi.csv')
         hourly = lib.make_multi_hourly(load_data)
         self.assertEqual(16, len(hourly),'one per load plus total')
 
     def test_make_hourly(self) -> None:
-        raw_data = lib.read_raw_no_header('test_data_multi.csv')
-        load_data = lib.resolve_name(raw_data)
+        load_data = lib.read_raw_no_header('test_data_multi.csv')
         hourly = lib.make_hourly(
                  load_data[load_data['load']=='load1'][['measure']])
         self.assertEqual(1, len(hourly), 'all data is in 14:00')
@@ -145,7 +138,7 @@ class TestLib(unittest.TestCase):
         # volts:      10.5 11.0 11.5 12.0 12.5 13.0 13.5 14.0
         # amps:       20.0 20.5 21.0 21.5 22.0 22.5 23.0 23.5
         # 
-        va = lib.decode_and_interpolate(i, b'x 0 x x 10 8081818181 20 8081818181')
+        va = lib.decode_and_interpolate(i, b'x 0 5701333034370A220D ct1 10 8081818181 20 8081818181')
         self.assertIsNotNone(va)
         if va: # this is for mypy
             self.assertEqual(8, len(va.volts))
@@ -167,11 +160,12 @@ class TestLib(unittest.TestCase):
     def test_interpolation_and_power(self) -> None:
         i = lib.interpolator(5)
         # same as above
-        va = lib.decode_and_interpolate(i, b'x 0 x x 10 8081818181 20 8081818181')
+        va = lib.decode_and_interpolate(i, b'x 0 5701333034370A220D ct1 10 8081818181 20 8081818181')
         self.assertIsNotNone(va)
         if va: # this is for mypy
             pwr = lib.average_power_watts(va.volts, va.amps)
             self.assertAlmostEqual(267.75, pwr, places=3)
+            self.assertEqual(b'load5', va.load)
   
 
 

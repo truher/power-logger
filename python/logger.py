@@ -110,7 +110,8 @@ def data_reader() -> None:
     # trim every 30 sec
     freq = 30
     # retain 15k rows (1 obs/sec, 3600 sec/h, 4h)
-    size = 100000
+    #size = 100000
+    size = 5000
     while True:
         try:
             # write <freq> lines
@@ -132,8 +133,9 @@ def summarizer() -> None:
         try:
             time.sleep(60)
             # all the raw data available
-            raw_data = lib.read_raw_no_header(RAW_DATA_FILENAME)
-            load_data = lib.resolve_name(raw_data)
+            #raw_data = lib.read_raw_no_header(RAW_DATA_FILENAME)
+            load_data = lib.read_raw_no_header(RAW_DATA_FILENAME)
+            #load_data = lib.resolve_name(raw_data)
             # all the hourly data available
             hourly = lib.make_multi_hourly(load_data)
             # this is the previously written history
@@ -184,14 +186,15 @@ def data() -> Any:
                                 option=orjson.OPT_SERIALIZE_NUMPY)
     return Response(json_payload, mimetype='application/json')
 
-#@app.route("/")
+@app.route("/foo")
 def index2() -> str:
     fig = Figure(figsize=(10,15))
     fig.set_tight_layout(True) # Make sure the titles don't overlap
 
     # (time, id, ct, measure)
-    raw_data = lib.read_raw_no_header(RAW_DATA_FILENAME)
-    load_data = lib.resolve_name(raw_data)
+    #raw_data = lib.read_raw_no_header(RAW_DATA_FILENAME)
+    load_data = lib.read_raw_no_header(RAW_DATA_FILENAME)
+    #load_data = lib.resolve_name(raw_data)
     plot_multi_raw_data(load_data, fig)
 
     hourly = lib.read_hourly_no_header(HOURLY_DATA_FILENAME)

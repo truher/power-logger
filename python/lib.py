@@ -9,16 +9,16 @@ from scipy import integrate #type:ignore
 from typing import Any, Callable, Dict, IO, List, Optional, Tuple, Union
 from collections import namedtuple
 
-# frame so we can use "merge" to join for the load names
-loadsdf = pd.DataFrame(data={
-          'id':["5737333034370D0E14", "5737333034370D0E14", #type:ignore
-                "5737333034370D0E14", "5737333034370D0E14",
-                "5737333034370A220D", "5737333034370A220D",
-                "5737333034370A220D", "5737333034370A220D"],
-          'ct':['ct1', 'ct2', 'ct3', 'ct4', #type:ignore
-                'ct1', 'ct2', 'ct3', 'ct4'],
-          'load':['load1', 'load2', 'load3', 'load4', #type:ignore
-                  'load5', 'load6', 'load7', 'load8']})
+############### frame so we can use "merge" to join for the load names
+##############loadsdf = pd.DataFrame(data={
+##############          'id':["5737333034370D0E14", "5737333034370D0E14", #type:ignore
+##############                "5737333034370D0E14", "5737333034370D0E14",
+##############                "5737333034370A220D", "5737333034370A220D",
+##############                "5737333034370A220D", "5737333034370A220D"],
+##############          'ct':['ct1', 'ct2', 'ct3', 'ct4', #type:ignore
+##############                'ct1', 'ct2', 'ct3', 'ct4'],
+##############          'load':['load1', 'load2', 'load3', 'load4', #type:ignore
+##############                  'load5', 'load6', 'load7', 'load8']})
 
 # see arduino.ino
 # TODO: use a common format somehow?
@@ -28,12 +28,20 @@ loadsdf = pd.DataFrame(data={
 # return (time, id, ct, measure)
 def read_raw_no_header(filename:str) -> pd.DataFrame:
     if os.path.isfile(filename):
-        return pd.read_csv(filename, delim_whitespace=True, comment='#', #type:ignore
+        x = pd.read_csv(filename, delim_whitespace=True, comment='#', #type:ignore
+        #return pd.read_csv(filename, delim_whitespace=True, comment='#', #type:ignore
                        index_col=0, parse_dates=True, header=0,
-                       names=['time','id','ct','measure'])
+                       #names=['time','id','ct','measure'])
+                       names=['time','load','measure'])
+        ###############3print(x)
+        #x.set_index(keys='time', inplace=True)
+        x.sort_index(inplace=True) #type:ignore
+        return x
     else:
-        x = pd.DataFrame(columns=['time','id','ct','measure'])
+        #x = pd.DataFrame(columns=['time','id','ct','measure'])
+        x = pd.DataFrame(columns=['time','load','measure'])
         x.set_index(keys='time', inplace=True) #type:ignore
+        x.sort_index(inplace=True) #type:ignore
         return x
 
 # return (time, measure, load)
@@ -47,12 +55,12 @@ def read_hourly_no_header(filename:str) -> pd.DataFrame:
         x.set_index(keys='time', inplace=True) #type:ignore
         return x
 
-# append a column for load name based on id and ct
-def resolve_name(raw_data:pd.DataFrame) -> pd.DataFrame:
-    x = raw_data.reset_index().merge(loadsdf, on=['id','ct']) #type:ignore
-    x.set_index(keys='time', inplace=True)
-    x.sort_index(inplace=True)
-    return x #type:ignore
+##########3# append a column for load name based on id and ct
+##########3#def resolve_name(raw_data:pd.DataFrame) -> pd.DataFrame:
+##########3#    #x = raw_data.reset_index().merge(loadsdf, on=['id','ct']) #type:ignore
+##########3#    x.set_index(keys='time', inplace=True)
+##########3#    x.sort_index(inplace=True)
+##########3#    return x #type:ignore
 
 # treat each load separately, then merge at the end
 # input (time, measure, load)
@@ -118,39 +126,37 @@ VA = namedtuple('VA', ['load','volts','amps'])
 # read a line from source (unparsed), prepend timestamp, write it to sink
 # close the source if something goes wrong
 # so now the raw data is not worth keeping
-def transcribe(sink:IO[bytes], interpolator:Callable[[List[int]],List[int]],
-               va_updater:Callable[[VA], None]) -> Callable[[IO[bytes]],None]:
+def transcribe(sink: IO[bytes],
+               interpolator: Callable[[List[int]],List[int]],
+               va_updater: Callable[[VA], None]) -> Callable[[IO[bytes]],None]:
     def f(source:serial.Serial)->None:
         try:
             #line = source.readline().rstrip().decode('ascii')
             line = source.readline().rstrip()
             if line:
-                #print(type(line))
-                #print("line")
-                #print(line)
                 #now = datetime.now().isoformat(timespec='microseconds')
                 now = datetime.now().isoformat(timespec='microseconds').encode('ascii')
+
+                # TODO fix the format
                 #old_format_line = f'{now} {line}'
                 old_format_line = now + b' ' + line
-                #print("old_format_line")
-                sink.write(old_format_line)
-                sink.write(b'\n')
-                sink.flush()
-                #print(old_format_line, file=sink, flush=True)
-                #print(type(old_format_line))
-                #print(old_format_line)
-                # also interpret the line
-                # TODO fix the format
+
                 va = decode_and_interpolate(interpolator, old_format_line)
                 if va:
-                    # TODO per-load update
                     va_updater(va)
+                    pwr = average_power_watts(va.volts, va.amps)
+                    real_old_format_line = f"{now.decode('ascii')}\t{va.load.decode('ascii')}\t{pwr}"
+                    sink.write(real_old_format_line.encode('ascii'))
+                    sink.write(b'\n')
+                    sink.flush()
+
         except serial.serialutil.SerialException:
             print("fail", source.port, file=sys.stderr)
             source.close()
     return f
 
 # trim file <filename> to latest <count> lines
+# TODO: use a circular mmap instead
 def trim(filename:str, count:int) -> None:
     lines = []
     with open(filename, 'rb') as source:
