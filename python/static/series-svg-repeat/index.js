@@ -1,4 +1,5 @@
-d3.text('repeat-data.csv').then(text => {
+//d3.text('repeat-data.csv').then(text => {
+d3.json('/summarydata').then(data => {
     //const data = d3.csvParseRows(text, d => d.map(s => Number(s)));
     //data = [
       //[1,2,3,4,5,6,7,8,9],
@@ -7,7 +8,7 @@ d3.text('repeat-data.csv').then(text => {
     //  [{x:1585789200000000000,y:1},{x:1585760400000000000,y:4},{x:1585746000000000000,y:1}],
     //  [{x:1585789200000000000,y:4},{x:1585760400000000000,y:8},{x:1585746000000000000,y:2}]
     //];
-    data = [
+    xdata = [
       [[1585789200000000000,1],[1585760400000000000,4],[1585746000000000000,1]],
       [[1585789200000000000,4],[1585760400000000000,8],[1585746000000000000,2]]
     ];
@@ -86,10 +87,9 @@ rd = [
     ]]
 ]
 console.log(seriesdata);
-    realdata = 
-[[1577836800000000000,"total",24.2261],
-[1580515200000000000,"total",24.2261],
-[1583020800000000000,"total",24.2261],
+    realdata = data;
+    xrealdata = 
+[
 [1585699200000000000,"load7",24.2261],
 [1585702800000000000,"load3",14.5199],
 [1585706400000000000,"total",18.9523],
@@ -119,11 +119,15 @@ console.log(seriesdata);
 [1585792800000000000,"load6",0.598398]];
 
 grped = d3.groups(realdata, d=>d[1])
+grped.sort((a,b)=>d3.ascending(a[0],b[0]));
 console.log("GROUPED");
 console.log(grped);
 console.log(JSON.stringify(grped));
+labels = grped.map(x=>x[0]);
+console.log(JSON.stringify(labels));
+seriesdata = grped.map(x => x[1]);
 
-labels = ['total','load1','load2','load3','load4','load5','load6','load7','load8'];
+//labels = ['total','load1','load2','load3','load4','load5','load6','load7','load8'];
 //console.log(realdata);
 // what i want is:
 // [[1,2,3] // row for total
@@ -158,7 +162,8 @@ labels = ['total','load1','load2','load3','load4','load5','load6','load7','load8
         .seriesSvgLine()
         //.crossValue((_, i) => i)
         //.mainValue(d => d.y)
-        .mainValue(d => d[1])
+        //.mainValue(d => d[1])
+        .mainValue(d => d[2])
         //.crossValue(d => new Date(d.x/1e6));
         .crossValue(d => new Date(d[0]/1e6));
 
@@ -184,7 +189,8 @@ labels = ['total','load1','load2','load3','load4','load5','load6','load7','load8
         //return x;
     //}]);
     //yExtent = fc.extentLinear().accessors([d=>{return d.y;}]);
-    yExtent = fc.extentLinear().accessors([d=>{return d[1];}]);
+    //yExtent = fc.extentLinear().accessors([d=>{return d[1];}]);
+    yExtent = fc.extentLinear().accessors([d=>{return d[2];}]);
     //xExtent = fc.extentTime().accessors([d=>new Date(d.x/1e6)]);
     xExtent = fc.extentTime().accessors([d=>new Date(d[0]/1e6)]);
 
@@ -196,11 +202,14 @@ labels = ['total','load1','load2','load3','load4','load5','load6','load7','load8
     //const xScale = d3.scaleLinear();
     //const yScale = d3.scaleLinear();
     console.log("FLAT");
-    console.log(data.flat());
+    //console.log(data.flat());
+    console.log(alldata);
 
     const chart = fc.chartCartesian(xScale, yScale)
-        .xDomain(xExtent(data.flat()))
-        .yDomain(yExtent(data.flat()))
+        //.xDomain(xExtent(data.flat()))
+        ////.yDomain(yExtent(data.flat()))
+        .xDomain(xExtent(alldata))
+        .yDomain(yExtent(alldata))
         .chartLabel('chart label')
         .xLabel('x label')
         .yLabel('y label')
