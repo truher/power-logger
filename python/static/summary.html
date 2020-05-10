@@ -13,6 +13,7 @@ body {
 }
 div {
   display: block;
+  margin: 20px;
 }
 d3fc-svg {
   display: block;
@@ -61,13 +62,9 @@ d3.json('/summarydata').then(data => {
   const chart = fc.chartCartesian(d3.scaleTime(), d3.scaleLinear())
     .xDomain(fc.extentTime().accessors([d => new Date(d[0]/1e6)])(flatdata))
     .yDomain(fc.extentLinear().accessors([d => {return d[2];}])(flatdata))
-    .chartLabel('kWh by hour')
-    .xLabel('hour')
     .yLabel('kilowatt-hours')
     .yOrient('left')
     .svgPlotArea(series);
-
-  d3.select('div#hourly').datum(group_vals).call(chart);
 
   const legend = d3.legendColor()
     .shapeWidth(30)
@@ -75,7 +72,23 @@ d3.json('/summarydata').then(data => {
     .scale(color)
     .labels(grouped_data.map(x => x[0]));
 
-  d3.select('div#hourly d3fc-group d3fc-svg svg').call(legend);
+  d3.select('div#hourly')
+    .datum(group_vals)
+    .call(chart.chartLabel('kWh by hour'))
+    .select('d3fc-group d3fc-svg.plot-area svg')
+    .call(legend);
+
+  d3.select('div#daily')
+    .datum(group_vals)
+    .call(chart.chartLabel('kWh by day'))
+    .select('d3fc-group d3fc-svg.plot-area svg')
+    .call(legend);
+
+  d3.select('div#monthly')
+    .datum(group_vals)
+    .call(chart.chartLabel('kWh by month'))
+    .select('d3fc-group d3fc-svg.plot-area svg')
+    .call(legend);
 
 });
 
