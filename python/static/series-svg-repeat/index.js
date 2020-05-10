@@ -70,6 +70,21 @@ d3.text('repeat-data.csv').then(text => {
 [1585738800000000000,2.28713]
 ]
 ];
+
+
+// THIS IS THE TARGET
+
+rd = [
+    ["total",[
+        [1,"total",2],[2,"total",3]
+    ]],
+    ["load1", [
+        [3,"load1",4],[5,"load1",6]
+    ]],
+    ["load2",[
+        [3,"load2",4],[5,"load2",6]
+    ]]
+]
 console.log(seriesdata);
     realdata = 
 [[1577836800000000000,"total",24.2261],
@@ -105,6 +120,7 @@ console.log(seriesdata);
 
 grped = d3.groups(realdata, d=>d[1])
 console.log("GROUPED");
+console.log(grped);
 console.log(JSON.stringify(grped));
 
 labels = ['total','load1','load2','load3','load4','load5','load6','load7','load8'];
@@ -179,6 +195,8 @@ labels = ['total','load1','load2','load3','load4','load5','load6','load7','load8
     const yScale = d3.scaleLinear();
     //const xScale = d3.scaleLinear();
     //const yScale = d3.scaleLinear();
+    console.log("FLAT");
+    console.log(data.flat());
 
     const chart = fc.chartCartesian(xScale, yScale)
         .xDomain(xExtent(data.flat()))
