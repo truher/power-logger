@@ -38,17 +38,48 @@ d3fc-svg {
 <div id="monthly" class="chart"></div>
 <div id="table"></div>
 <script>
-d3.json('/summarydata').then(data => {
+d3.json('/summarydata').then(json_data => {
+  //console.log(json_data);
+  //parsed_data = json_data.map(x=>[new Date(x[0]/1e6),x[1],+x[2]]);
+  parsed_data = json_data.map(x=>{
+    return {
+      time:x[0]/1e6,
+      load:x[1],
+      measure:+x[2]
+    };
+  });
+  //console.log(parsed_data);
 
-  const grouped_data = d3.groups(data, d=>d[1])
+  //const grouped_data = d3.groups(data, d=>d[1])
+  //const grouped_data = d3.groups(parsed_data, d=>d[1])
+  const grouped_data = d3.groups(parsed_data, d=>d.load)
   grouped_data.sort((a,b)=>d3.ascending(a[0],b[0]));
+console.log("grouped_data");
+console.log(grouped_data);
 
   const group_vals = grouped_data.map(x => x[1]);
 
+  //console.log(group_vals);
+
+  daily = parsed_data.map(x=>{
+    return {
+      time:new Date(x.time).setHours(0,0,0,0),
+      load:x.load,
+      measure:x.measure
+    };
+  });
+//console.log(daily);
+  rolled = d3.rollups(daily, v=>d3.sum(v, d=>d.measure), d=>d.load, d=>d.time);
+  console.log("rolled");
+  console.log(rolled);
+
   const line = fc
     .seriesSvgLine()
-    .crossValue(d => new Date(d[0]/1e6))
-    .mainValue(d => d[2]);
+    //.crossValue(d => new Date(d[0]/1e6))
+    //.crossValue(d => d[0])
+    .crossValue(d => new Date(d.time))
+    //.mainValue(d => d[2]);
+    .mainValue(d => d.measure);
 
   const color = d3.scaleOrdinal(d3.range(group_vals.length),
     d3.schemeCategory10);
@@ -60,8 +91,11 @@ d3.json('/summarydata').then(data => {
 
   const flatdata = group_vals.flat();
   const chart = fc.chartCartesian(d3.scaleTime(), d3.scaleLinear())
-    .xDomain(fc.extentTime().accessors([d => new Date(d[0]/1e6)])(flatdata))
-    .yDomain(fc.extentLinear().accessors([d => {return d[2];}])(flatdata))
+    //.xDomain(fc.extentTime().accessors([d => new Date(d[0]/1e6)])(flatdata))
+    //.xDomain(fc.extentTime().accessors([d => d[0]])(flatdata))
+    .xDomain(fc.extentTime().accessors([d => new Date(d.time)])(flatdata))
+    //.yDomain(fc.extentLinear().accessors([d => d[2]])(flatdata))
+    .yDomain(fc.extentLinear().accessors([d => d.measure])(flatdata))
     .yLabel('kilowatt-hours')
     .yOrient('left')
     .svgPlotArea(series);
