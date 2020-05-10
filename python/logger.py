@@ -153,6 +153,7 @@ def summarizer() -> None:
                                #date_format='%Y-%m-%dT%H:%M:%S',
             hourly_file.to_csv(HOURLY_DATA_FILENAME,
                                sep=' ',
+                               header=False,
                                date_format='%Y-%m-%dT%H',
                                quoting=csv.QUOTE_NONE,
                                float_format='%.6g')
@@ -167,7 +168,27 @@ def index() -> Any:
     print('index')
     return app.send_static_file('logger.html')
 
+@app.route('/summary')
+def summary() -> Any:
+    print('summary')
+    return app.send_static_file('summary.html')
 
+
+@app.route('/summarydata')
+def summarydata() -> Any:
+    print('summarydata')
+    hourly = lib.read_hourly_no_header(HOURLY_DATA_FILENAME)
+    #x = [{'x':1, 'y':1}]
+    #json_payload = orjson.dumps(x, option=orjson.OPT_SERIALIZE_NUMPY)
+    # TODO: im' sure this is too slow
+    #json_payload = hourly.reset_index().pivot(index='time',columns='load',
+    #    values='measure').to_json(date_format='iso')
+    #json_payload = hourly.pivot(columns='load',
+    #    values='measure').to_json(date_format='iso')
+    #json_payload = hourly.pivot(columns='load',values='measure').reset_index().to_json(date_format='iso', orient='records', indent=1)
+    #json_payload = hourly.reset_index().to_json(date_format='iso', orient='records', indent=1)
+    json_payload = orjson.dumps(hourly.to_records().tolist())
+    return Response(json_payload, mimetype='application/json')
 
 @app.route('/data')
 def data() -> Any:

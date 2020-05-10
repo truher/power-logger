@@ -1,0 +1,49 @@
+<!doctype html>
+<script src="https://unpkg.com/d3"></script>
+<script src="https://unpkg.com/d3-array"></script>
+<script src="https://unpkg.com/d3fc"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.js"></script>
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=">
+<style>
+body {
+    /*color: #1b1e23;*/
+    font-size: small;
+    font-family: sans-serif;
+    /*height: calc(100vh - 2em);*/
+    /*height: 200px;*/
+    /*margin: 1em;*/
+    /*display: block;*/
+    /*display: flex;*/
+}
+
+/*body > * {
+    flex: auto;
+}*/
+
+/*div {display:block; height:200px; width:400px;}*/
+div {display:block;}
+/*d3fc-svg {display:block; height:200px; width:200px;}*/
+d3fc-svg {display:block; height:200px;}
+
+.domain, .gridline-y, .gridline-x, .annotation-line>line {
+    stroke: currentColor;
+    stroke-opacity: 0.1;
+}
+        .line {
+            stroke: inherit;
+        }
+.legendCells {
+  /*position: absolute;
+  top: 5em;
+  left: 150px;
+  width: 150px;
+  height: 100px;*/
+  font-size: 0.8em;
+}
+
+</style>
+
+<div id="foo">
+<!--svg id="legend"></svg-->
+</div>
+<script src="index.js"></script>

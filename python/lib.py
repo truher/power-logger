@@ -9,17 +9,6 @@ from scipy import integrate #type:ignore
 from typing import Any, Callable, Dict, IO, List, Optional, Tuple, Union
 from collections import namedtuple
 
-############### frame so we can use "merge" to join for the load names
-##############loadsdf = pd.DataFrame(data={
-##############          'id':["5737333034370D0E14", "5737333034370D0E14", #type:ignore
-##############                "5737333034370D0E14", "5737333034370D0E14",
-##############                "5737333034370A220D", "5737333034370A220D",
-##############                "5737333034370A220D", "5737333034370A220D"],
-##############          'ct':['ct1', 'ct2', 'ct3', 'ct4', #type:ignore
-##############                'ct1', 'ct2', 'ct3', 'ct4'],
-##############          'load':['load1', 'load2', 'load3', 'load4', #type:ignore
-##############                  'load5', 'load6', 'load7', 'load8']})
-
 # see arduino.ino
 # TODO: use a common format somehow?
 # TODO: use tab or space not both
@@ -30,10 +19,9 @@ def read_raw_no_header(filename:str) -> pd.DataFrame:
     if os.path.isfile(filename):
         x = pd.read_csv(filename, delim_whitespace=True, comment='#', #type:ignore
         #return pd.read_csv(filename, delim_whitespace=True, comment='#', #type:ignore
-                       index_col=0, parse_dates=True, header=0,
+                       index_col=0, parse_dates=True, header=None,
                        #names=['time','id','ct','measure'])
                        names=['time','load','measure'])
-        ###############3print(x)
         #x.set_index(keys='time', inplace=True)
         x.sort_index(inplace=True) #type:ignore
         return x
@@ -48,19 +36,12 @@ def read_raw_no_header(filename:str) -> pd.DataFrame:
 def read_hourly_no_header(filename:str) -> pd.DataFrame:
     if os.path.isfile(filename):
         return pd.read_csv(filename, delim_whitespace=True, comment='#', #type:ignore
-                       index_col=0, parse_dates=True, header=0,
+                       index_col=0, parse_dates=True, header=None,
                        names=['time','load','measure'])
     else:
         x = pd.DataFrame(columns=['time','load','measure'])
         x.set_index(keys='time', inplace=True) #type:ignore
         return x
-
-##########3# append a column for load name based on id and ct
-##########3#def resolve_name(raw_data:pd.DataFrame) -> pd.DataFrame:
-##########3#    #x = raw_data.reset_index().merge(loadsdf, on=['id','ct']) #type:ignore
-##########3#    x.set_index(keys='time', inplace=True)
-##########3#    x.sort_index(inplace=True)
-##########3#    return x #type:ignore
 
 # treat each load separately, then merge at the end
 # input (time, measure, load)
@@ -249,15 +230,11 @@ def read_new_raw(filename:str) -> Any:
 
 # avoid creating the bases for every row, create it once
 def interpolator(samples:int) -> Callable[[List[int]], List[int]]:
-    #print("interpolator0")
     # x vals for observations
     interp_xp = np.linspace(0, samples - 1, samples)
-    #print("interpolator1")
     # x vals for interpolations, adds in-between vals
     interp_x = np.linspace(0, samples - 1, 2 * samples - 1)
-    #print("interpolator2")
     def f(cumulative:List[int]) -> List[int]:
-        #print("interpolator3")
         return np.interp(interp_x, interp_xp, cumulative) #type:ignore
     return f
 
@@ -265,22 +242,13 @@ def interpolator(samples:int) -> Callable[[List[int]], List[int]]:
 def bytes_to_array(interpolator:Callable[[List[int]],List[int]],
                    all_fields:List[bytes], data_col:int, first_col:int,
                    trim_first:bool ) -> Any:
-    ########print("type(all_fields)")
-    #######print(type(all_fields))
-    #######print(all_fields)
     try:
-        #######print("b0")
         field = all_fields[data_col]
-        #######print("b1")
         decoded = binascii.unhexlify(field)
-        #######print("b2")
         first = int(all_fields[first_col])
-        #######print("b3")
         offsetted = (y-128 for y in decoded)
-        #######print("b4")
         cumulative = list(itertools.accumulate(offsetted, func=operator.add, initial=first))
         # TODO: stop encoding the first delta as zero
-        #######print("b5")
         cumulative.pop(0)
         interpolated = interpolator(cumulative)
         if trim_first:
@@ -295,14 +263,12 @@ def bytes_to_array(interpolator:Callable[[List[int]],List[int]],
 
 # input: fields from arduino, WITHOUT the time stamp
 def goodrow(x:List[bytes]) -> bool:
-    #######print("goodrow")
     if x is None:
         print(f'skip empty row')
         return False
     if len(x) != 8:
         print(f'skip row len {len(x)}')
         return False
-    #######print(type(x[1]))
     if x[1] != b'0':
         print(f'skip row err {x[1]!r}')
         return False
@@ -320,15 +286,7 @@ loadnames = {b"5737333034370D0E14ct1":b'load1',
 # extract name from a row
 # TODO: change to new format
 def load(x:List[bytes]) -> bytes:
-    id = x[2]
-    ct = x[3]
-    #print("id")
-    #print(id)
-    #print("ct")
-    #print(ct)
-    #print("id+ct")
-    #print(id+ct)
-    return loadnames[id+ct]
+    return loadnames[x[2]+x[3]]
 
 
 # input: one raw row from arduino, WITHOUT the time stamp
@@ -336,25 +294,17 @@ def load(x:List[bytes]) -> bytes:
 # output: (volts[], amps[]) to suit VI plots, or None, for invalid row
 def decode_and_interpolate(interpolator:Callable[[List[int]],List[int]],
                            line:bytes) -> Optional[VA]:
-    #######print("interp")
-    #######print(type(line))
-    #print(line)
     fields = line.split()
 
     if not goodrow(fields):
         return None # skip obviously bad rows
 
     load_name = load(fields)
-    #print("load_name")
-    #print(load_name)
-
-    #######print("interp2")
 
     # volts is the first observation, so trim the first value
     volts:List[int] = bytes_to_array(interpolator,fields,5,4,True)
     if volts is None:
-        return None
-        # skip uninterpretable rows
+        return None # skip uninterpretable rows
 
     # amps is the second observation, so trim the last value
     amps:List[int] = bytes_to_array(interpolator,fields,7,6,False)

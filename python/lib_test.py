@@ -20,7 +20,6 @@ class TestLib(unittest.TestCase):
         self.assertEqual("xyz", x['ct']) #type:ignore
         self.assertAlmostEqual(1.0, x['measure'], 3) #type:ignore
 
-
     def test_transcribe(self) -> None:
         def v(va:lib.VA) -> None:
             pass
@@ -63,11 +62,6 @@ class TestLib(unittest.TestCase):
         raw_data = lib.read_raw_no_header('test_data_multi.csv')
         self.assertEqual(24, len(raw_data))
         self.assertCountEqual(['load','measure'], list(raw_data.columns))
-
-#######    def test_resolve_name(self) -> None:
-#######        raw_data = lib.read_raw_no_header('test_data_multi.csv')
-#######        load_data = lib.resolve_name(raw_data)
-#######        self.assertEqual(24, len(load_data))
 
     def test_make_multi_hourly(self) -> None:
         load_data = lib.read_raw_no_header('test_data_multi.csv')
@@ -166,9 +160,6 @@ class TestLib(unittest.TestCase):
             pwr = lib.average_power_watts(va.volts, va.amps)
             self.assertAlmostEqual(267.75, pwr, places=3)
             self.assertEqual(b'load5', va.load)
-  
-
 
 if __name__ == '__main__':
     unittest.main()
-
