@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<title>Summary</title>
+<script src="https://unpkg.com/d3"></script>
+<script src="https://unpkg.com/d3-array"></script>
+<script src="https://unpkg.com/d3fc"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.25.6/d3-legend.js"></script>
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=">
+
+<style>
+body {
+  font-size: small;
+  font-family: sans-serif;
+}
+div {
+  display: block;
+}
+d3fc-svg {
+  display: block;
+  height: 200px;
+}
+.domain, .gridline-y, .gridline-x, .annotation-line>line {
+  stroke: currentColor;
+  stroke-opacity: 0.1;
+}
+.line {
+  stroke: inherit;
+}
+.legendCells {
+  font-size: 0.8em;
+}
+</style>
+
+
+<div id="raw" class="chart"></div>
+<div id="hourly" class="chart"></div>
+<div id="daily" class="chart"></div>
+<div id="monthly" class="chart"></div>
+<div id="table"></div>
+<script>
+d3.json('/summarydata').then(data => {
+
+  const grouped_data = d3.groups(data, d=>d[1])
+  grouped_data.sort((a,b)=>d3.ascending(a[0],b[0]));
+
+  const group_vals = grouped_data.map(x => x[1]);
+
+  const line = fc
+    .seriesSvgLine()
+    .crossValue(d => new Date(d[0]/1e6))
+    .mainValue(d => d[2]);
+
+  const color = d3.scaleOrdinal(d3.range(group_vals.length),
+    d3.schemeCategory10);
+
+  const series = fc.seriesSvgRepeat()
+    .orient('horizontal')
+    .series(line)
+    .decorate(sel => { sel.attr('stroke', (_, i) => color(i)); });
+
+  const flatdata = group_vals.flat();
+  const chart = fc.chartCartesian(d3.scaleTime(), d3.scaleLinear())
+    .xDomain(fc.extentTime().accessors([d => new Date(d[0]/1e6)])(flatdata))
+    .yDomain(fc.extentLinear().accessors([d => {return d[2];}])(flatdata))
+    .chartLabel('kWh by hour')
+    .xLabel('hour')
+    .yLabel('kilowatt-hours')
+    .yOrient('left')
+    .svgPlotArea(series);
+
+  d3.select('div#hourly').datum(group_vals).call(chart);
+
+  const legend = d3.legendColor()
+    .shapeWidth(30)
+    .orient('vertical')
+    .scale(color)
+    .labels(grouped_data.map(x => x[0]));
+
+  d3.select('div#hourly d3fc-group d3fc-svg svg').call(legend);
+
+});
+
+
+</script>
