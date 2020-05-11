@@ -166,7 +166,27 @@ def summarizer() -> None:
 @app.route('/')
 def index() -> Any:
     print('index')
+    return app.send_static_file('index.html')
+
+@app.route('/logger')
+def logger() -> Any:
+    print('logger')
     return app.send_static_file('logger.html')
+
+@app.route('/raw')
+def raw() -> Any:
+    print('raw')
+    return app.send_static_file('raw.html')
+
+@app.route('/rawdata')
+def rawdata() -> Any:
+    print('rawdata')
+    #hourly = lib.read_hourly_no_header(HOURLY_DATA_FILENAME)
+    raw_data = lib.read_raw_no_header(RAW_DATA_FILENAME)
+    print(raw_data)
+    json_payload = orjson.dumps(raw_data.to_records().tolist())
+    print(json_payload)
+    return Response(json_payload, mimetype='application/json')
 
 @app.route('/summary')
 def summary() -> Any:
