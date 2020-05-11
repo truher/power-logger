@@ -1,8 +1,106 @@
 <!DOCTYPE html>
-<title>demo</title>
+<title>Logger</title>
 <script src="https://unpkg.com/d3/dist/d3.js"></script>
 <script src="https://unpkg.com/d3fc/build/d3fc.js"></script>
-<link rel="stylesheet" href="/static/logger.css">
 <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=">
+<style>
+body {
+    color: #1b1e23;
+    font-size: small;
+    font-family: sans-serif;
+    height: calc(100vh - 2em);
+    margin: 1em;
+    display: flex;
+}
+
+body > * {
+    flex: auto;
+}
+
+.domain, .gridline-y, .gridline-x, .annotation-line>line {
+    stroke: currentColor;
+    stroke-opacity: 0.1;
+}
+
+  .area {
+    fill: #cec6b9;
+  }
+  #small-multiples > div {
+    display: inline-block;
+    width: 250px;
+    height: 250px;
+  }
+  .x-axis .domain, .x-axis .tick path,
+  .y-axis .domain, .y-axis .tick path {
+    display: none;
+  }
+  .x-axis {
+    height: 1.5em !important;
+  }
+  .gridline-x {
+    stroke: white;
+  }
+  d3fc-group.cartesian-chart > .x-label { font-size: 12px; }
+  d3fc-group.cartesian-chart > .y-label { font-size: 12px; }
+  d3fc-group.cartesian-chart .tick { font-size: 10px; }
+  d3fc-group.cartesian-chart .tick { font-size: 10px; }
+  d3fc-group.cartesian-chart > .chart-label { font-size: 16px; }
+  div#instance { margin: 12px; }
+</style>
 <d3fc-group id='small-multiples'></d3fc-group>
-<script src="/static/logger.js"></script>
+<script>
+const xScale = d3.scaleLinear().domain([-1, 1024]);
+const yScale = d3.scaleLinear().domain([-1, 1024]);
+
+const series = fc.seriesWebglPoint()
+    .crossValue(d => d.x)
+    .mainValue(d => d.y)
+    .xScale(xScale)
+    .yScale(yScale)
+    .type(d3.symbolCircle)
+    .size(9);
+
+const multi = fc.seriesWebglMulti()
+    .series([series])
+    .mapping(function(d,i,s) { return d.value; });
+
+const chart = fc.chartCartesian(xScale, yScale)
+    .webglPlotArea(multi)
+    .chartLabel(d => d.key)
+    .xLabel('x axis')
+    .yLabel('y axis')
+    .yOrient('left') ;
+
+const container = document.querySelector('#small-multiples');
+
+let allloads = {};
+
+d3.select(container)
+    .on('measure', () => {
+        xScale.range([0, event.detail.width]);
+        yScale.range([event.detail.height, 0]);
+    })
+    .on('draw', () => {
+        d3.json('/data').then(function(data) {
+            data.map(function(row){
+                zdz = d3.zip(row.x,row.y).map(function(d){return {x:d[0],y:d[1]}});
+                allloads[row.label] = zdz;
+            });
+            dd = d3.entries(allloads);
+            dd.sort((a,b)=>(a.key > b.key)?1:-1)
+            d3.select('#small-multiples')
+                .selectAll('div#instance')
+                .data(dd)
+                .join(
+                    enter => enter.append('div').attr('id', 'instance'),
+                    update => update.call(chart)
+                );
+        });
+    });
+
+container.requestRedraw();
+
+setInterval(() => {container.requestRedraw();}, 500);
+
+
+</script>
