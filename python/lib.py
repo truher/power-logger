@@ -114,6 +114,7 @@ def transcribe(sink: IO[bytes],
         try:
             #line = source.readline().rstrip().decode('ascii')
             line = source.readline().rstrip()
+            print("readline")
             if line:
                 #now = datetime.now().isoformat(timespec='microseconds')
                 now = datetime.now().isoformat(timespec='microseconds').encode('ascii')
@@ -139,6 +140,7 @@ def transcribe(sink: IO[bytes],
 # trim file <filename> to latest <count> lines
 # TODO: use a circular mmap instead
 def trim(filename:str, count:int) -> None:
+    print("trim")
     lines = []
     with open(filename, 'rb') as source:
         lines = source.readlines()
@@ -317,3 +319,26 @@ def decode_and_interpolate(interpolator:Callable[[List[int]],List[int]],
 # output: average power in watts
 def average_power_watts(volts: List[int], amps: List[int]) -> int:
     return np.average(np.multiply(volts, amps)) #type:ignore
+
+# from https://github.com/pyserial/pyserial/issues/216
+class ReadLine:
+    def __init__(self, s):
+        self.buf = bytearray()
+        self.s = s
+    
+    def readline(self):
+        i = self.buf.find(b"\n")
+        if i >= 0:
+            r = self.buf[:i+1]
+            self.buf = self.buf[i+1:]
+            return r
+        while True:
+            i = max(1, min(2048, self.s.in_waiting))
+            data = self.s.read(i)
+            i = data.find(b"\n")
+            if i >= 0:
+                r = self.buf + data[:i+1]
+                self.buf[0:] = data[i+1:]
+                return r
+            else:
+                self.buf.extend(data)

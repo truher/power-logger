@@ -47,6 +47,7 @@ def data_reader() -> None:
     size = 5000
     while True:
         try:
+            print("read loop")
             # write <freq> lines
             with open(RAW_DATA_FILENAME, 'ab') as sink:
                 transcriber = lib.transcribe(sink, interpolator, va_updater)
