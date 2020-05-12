@@ -5,7 +5,7 @@ import serial #type:ignore
 import csv, orjson, queue, sys, threading, time, traceback, warnings
 from flask import Flask, Response
 from waitress import serve #type:ignore
-from typing import Any
+from typing import Any,Optional
 import lib
 
 RAW_DATA_FILENAME = 'data_raw.csv'
@@ -15,7 +15,7 @@ app = Flask(__name__)
 # TODO: remove this
 rng = np.random.default_rng() #type:ignore
 
-raw_queue: queue.SimpleQueue[bytes] = queue.SimpleQueue()
+raw_queue: queue.SimpleQueue[Optional[bytes]] = queue.SimpleQueue()
 
 # arduino takes batches of 1000 points
 OBSERVATION_COUNT = 1000
@@ -42,30 +42,39 @@ def va_updater(va:lib.VA) -> None:
 
 transcriber = lib.transcribe(raw_queue, interpolator, va_updater)
 
-# continuously read serial inputs and write data to the raw data file 
-# TODO: move to lib
-def data_reader() -> None:
-    serials:serial.Serial = []
-    FREQ = 30 # trim every 30 rows
-    SIZE = 5000 # size of raw file to retain
+FREQ = 30 # trim every 30 rows
+SIZE = 5000 # size of raw file to retain
+
+# read some rows from the queue, write them to the raw data file
+# and periodically trim it.
+def data_writer() -> None:
     while True:
         try:
             with open(RAW_DATA_FILENAME, 'ab') as sink:
-                # write <FREQ> lines
-                for lines in range(FREQ):
+                for lines in range(FREQ): # write <FREQ> lines
                     #time.sleep(2) # this should fall behind
-                    # refresh after *every* row?  TODO: do this differently
-                    serials = lib.refresh_serials(serials)
-                    for serial in serials:
-                        transcriber(serial)
-                        payload = raw_queue.get()
-                        if payload: # could be None
-                            sink.write(payload)
-                            sink.write(b'\n')
-                            sink.flush()
-                    #[*map(transcriber, serials)]
-            # trim the file
-            lib.trim(RAW_DATA_FILENAME, SIZE) 
+                    payload = raw_queue.get()
+                    if payload: # could be None
+                        sink.write(payload)
+                        sink.write(b'\n')
+                        sink.flush()
+                        print(f'queue size {raw_queue.qsize()}')
+            lib.trim(RAW_DATA_FILENAME, SIZE) # trim the file
+        except:
+            traceback.print_exc(file=sys.stderr)
+            print("top level exception",
+                      sys.exc_info()[0], file=sys.stderr)
+
+# continuously read serial inputs and write to the queue
+def data_reader() -> None:
+    serials:serial.Serial = []
+    while True:
+        try:
+            # refresh after *every* row?  TODO: do this differently
+            serials = lib.refresh_serials(serials)
+            for serial in serials:
+                # read one line from serial, write to queue
+                transcriber(serial)
         except:
             traceback.print_exc(file=sys.stderr)
             print("top level exception",
@@ -157,6 +166,7 @@ def data() -> Any:
 def main() -> None:
     warnings.filterwarnings('ignore')
     threading.Thread(target=data_reader).start()
+    threading.Thread(target=data_writer).start()
     threading.Thread(target=summarizer).start()
     serve(app, host="0.0.0.0", port=5000)
 

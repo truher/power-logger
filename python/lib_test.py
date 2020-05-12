@@ -1,7 +1,7 @@
 from __future__ import annotations
 import io, lib, queue, unittest
 import numpy as np
-from typing import IO,List
+from typing import IO,List,Optional
 
 # show how to do a unittest of a naked function
 
@@ -26,15 +26,17 @@ class TestLib(unittest.TestCase):
             pass
         #sink = io.StringIO()
         #sink = io.BytesIO()
-        sink: queue.SimpleQueue[bytes] = queue.SimpleQueue()
+        sink: queue.SimpleQueue[Optional[bytes]] = queue.SimpleQueue()
         i = lib.interpolator(5)
         f = lib.transcribe(sink, i, v)
         source:IO[bytes] = io.BytesIO(b'0 5701333034370A220D ct1 10 8081818181 20 8081818181')
         f(source) #type:ignore
         #content:bytes = sink.getvalue()
-        content:bytes = sink.get()
-        #self.assertEqual(b"load5\t267.75\n", content[-13:])
-        self.assertEqual(b"load5\t267.75", content[-12:])
+        content:Optional[bytes] = sink.get()
+        self.assertIsNotNone(content)
+        if content:
+            #self.assertEqual(b"load5\t267.75\n", content[-13:])
+            self.assertEqual(b"load5\t267.75", content[-12:])
 
     def test_io_write_str(self) -> None:
         output = io.StringIO()

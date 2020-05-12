@@ -2,7 +2,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import serial #type:ignore
-import binascii, itertools, operator, os, queue, sys
+import serial.threaded #type:ignore
+import binascii, itertools, operator, os, queue, sys, traceback
 
 from datetime import datetime
 from glob import glob
@@ -10,6 +11,26 @@ from scipy import integrate #type:ignore
 from typing import Any, Callable, Dict, IO, List, Optional, Tuple, Union
 from collections import namedtuple
 
+
+# for threaded reader, see
+# https://github.com/pyserial/pyserial/blob/master/serial/threaded/__init__.py
+# and
+# https://pythonhosted.org/pyserial/pyserial_api.html#module-serial.threaded
+
+class QueueLine(serial.threaded.Packetizer): #type:ignore
+    TERMINATOR = b'\n'
+    def __init__(self, raw_queue: queue.SimpleQueue[bytes]) -> None:
+        super().__init__()
+        self.raw_queue = raw_queue
+    def connection_made(self, transport: serial.threading.ReaderThread) -> None:
+        print('port opened')
+        super().connection_made(transport)
+    def handle_packet(self, packet: bytes) -> None:
+        print(packet)
+        self.raw_queue.put(packet)
+    def connection_lost(self, exc:Exception) -> None:
+        print('port closed')
+        super().connection_lost(exc)
 
 # from https://github.com/pyserial/pyserial/issues/216
 class ReadLine:
@@ -135,7 +156,7 @@ VA = namedtuple('VA', ['load','volts','amps'])
 # so now the raw data is not worth keeping
 # TODO: write it to the queue instead of the sink
 #def transcribe(sink: IO[bytes],
-def transcribe(sink_queue: queue.SimpleQueue[bytes],
+def transcribe(sink_queue: queue.SimpleQueue[Optional[bytes]],
                interpolator: Callable[[List[int]],List[int]],
                #va_updater: Callable[[VA], None]) -> Callable[[IO[bytes]],None]:
                va_updater: Callable[[VA], None]) -> Callable[[ReadLine],None]:
