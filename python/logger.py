@@ -6,6 +6,7 @@ import csv, orjson, queue, sys, threading, time, traceback, warnings
 from flask import Flask, Response
 from waitress import serve #type:ignore
 from typing import Any,Optional
+from datetime import datetime
 import lib
 
 RAW_DATA_FILENAME = 'data_raw.csv'
@@ -53,11 +54,46 @@ def data_writer() -> None:
             with open(RAW_DATA_FILENAME, 'ab') as sink:
                 for lines in range(FREQ): # write <FREQ> lines
                     #time.sleep(2) # this should fall behind
-                    payload = raw_queue.get()
-                    if payload: # could be None
-                        sink.write(payload)
-                        sink.write(b'\n')
-                        sink.flush()
+                    #payload = raw_queue.get()
+                    line = raw_queue.get()
+                    # payload is old format line
+                    # make it raw input
+                    #if payload: # could be None
+                    if line: # could be None
+
+                        #now = datetime.now().isoformat(timespec='microseconds')
+                        now = datetime.now().isoformat(timespec='microseconds').encode('ascii')
+
+                        # TODO fix the format
+                        #old_format_line = f'{now} {line}'
+                        old_format_line = now + b' ' + line
+
+                        va = lib.decode_and_interpolate(interpolator, old_format_line)
+                        if va:
+                            va_updater(va)
+                            pwr = lib.average_power_watts(va.volts, va.amps)
+                            real_old_format_line = f"{now.decode('ascii')}\t{va.load.decode('ascii')}\t{pwr}"
+                            # TODO: remove this newline
+                            #sink_queue.put(real_old_format_line.encode('ascii') + b'\n')
+                            #sink_queue.put(real_old_format_line.encode('ascii'))
+
+                            sink.write(real_old_format_line.encode('ascii'))
+                            sink.write(b'\n')
+                            sink.flush()
+                        #else:
+                        #    # TODO: remove this
+                        #    # to keep the queue consumer from getting stuck
+                        #    sink_queue.put(None)
+
+
+
+
+
+
+
+                        #sink.write(payload)
+                        #sink.write(b'\n')
+                        #sink.flush()
                         print(f'queue size {raw_queue.qsize()}')
             lib.trim(RAW_DATA_FILENAME, SIZE) # trim the file
         except:

@@ -29,14 +29,16 @@ class TestLib(unittest.TestCase):
         sink: queue.SimpleQueue[Optional[bytes]] = queue.SimpleQueue()
         i = lib.interpolator(5)
         f = lib.transcribe(sink, i, v)
-        source:IO[bytes] = io.BytesIO(b'0 5701333034370A220D ct1 10 8081818181 20 8081818181')
+        payload = b'0 5701333034370A220D ct1 10 8081818181 20 8081818181'
+        source:IO[bytes] = io.BytesIO(payload)
         f(source) #type:ignore
         #content:bytes = sink.getvalue()
         content:Optional[bytes] = sink.get()
         self.assertIsNotNone(content)
         if content:
             #self.assertEqual(b"load5\t267.75\n", content[-13:])
-            self.assertEqual(b"load5\t267.75", content[-12:])
+            #self.assertEqual(b"load5\t267.75", content[-12:])
+            self.assertEqual(payload, content)
 
     def test_io_write_str(self) -> None:
         output = io.StringIO()

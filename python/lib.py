@@ -168,28 +168,34 @@ def transcribe(sink_queue: queue.SimpleQueue[Optional[bytes]],
             print("readline")
             #print(line)
             if line:
-                #now = datetime.now().isoformat(timespec='microseconds')
-                now = datetime.now().isoformat(timespec='microseconds').encode('ascii')
 
-                # TODO fix the format
-                #old_format_line = f'{now} {line}'
-                old_format_line = now + b' ' + line
+                sink_queue.put(line)
 
-                va = decode_and_interpolate(interpolator, old_format_line)
-                if va:
-                    va_updater(va)
-                    pwr = average_power_watts(va.volts, va.amps)
-                    real_old_format_line = f"{now.decode('ascii')}\t{va.load.decode('ascii')}\t{pwr}"
-                    # TODO: remove this newline
-                    #sink_queue.put(real_old_format_line.encode('ascii') + b'\n')
-                    sink_queue.put(real_old_format_line.encode('ascii'))
-                    #sink.write(real_old_format_line.encode('ascii'))
-                    #sink.write(b'\n')
-                    #sink.flush()
-                else:
-                    # TODO: remove this
-                    # to keep the queue consumer from getting stuck
-                    sink_queue.put(None)
+
+
+
+#                #now = datetime.now().isoformat(timespec='microseconds')
+#                now = datetime.now().isoformat(timespec='microseconds').encode('ascii')
+#
+#                # TODO fix the format
+#                #old_format_line = f'{now} {line}'
+#                old_format_line = now + b' ' + line
+#
+#                va = decode_and_interpolate(interpolator, old_format_line)
+#                if va:
+#                    va_updater(va)
+#                    pwr = average_power_watts(va.volts, va.amps)
+#                    real_old_format_line = f"{now.decode('ascii')}\t{va.load.decode('ascii')}\t{pwr}"
+#                    # TODO: remove this newline
+#                    #sink_queue.put(real_old_format_line.encode('ascii') + b'\n')
+#                    sink_queue.put(real_old_format_line.encode('ascii'))
+#                    #sink.write(real_old_format_line.encode('ascii'))
+#                    #sink.write(b'\n')
+#                    #sink.flush()
+#                else:
+#                    # TODO: remove this
+#                    # to keep the queue consumer from getting stuck
+#                    sink_queue.put(None)
 
         except serial.serialutil.SerialException:
             print("fail", source.s.port, file=sys.stderr)
