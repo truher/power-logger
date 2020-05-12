@@ -2,6 +2,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import serial #type:ignore
+from serial.threaded import ReaderThread #type:ignore
 import csv, orjson, queue, sys, threading, time, traceback, warnings
 from flask import Flask, Response
 from waitress import serve #type:ignore
@@ -42,8 +43,8 @@ def va_updater(va:lib.VA) -> None:
     latest_va[loadname]['y'] = va.amps
 
 
-FREQ = 30 # trim every 30 rows
-SIZE = 5000 # size of raw file to retain
+TRIM_FREQ = 100 # trim every 30 rows
+TRIM_SIZE = 5000 # size of raw file to retain
 
 # read some rows from the queue, write them to the raw data file
 # and periodically trim it.
@@ -51,9 +52,9 @@ def data_writer() -> None:
     while True:
         try:
             with open(RAW_DATA_FILENAME, 'ab') as sink:
-                for lines in range(FREQ): # write <FREQ> lines
+                for lines in range(TRIM_FREQ):
 
-                    #time.sleep(2) # this should fall behind
+                    #time.sleep(2) # this should fall behind without corruption
                     line = raw_queue.get()
                     now = datetime.now().isoformat(timespec='microseconds').encode('ascii')
 
@@ -71,29 +72,23 @@ def data_writer() -> None:
                         sink.flush()
                         print(f'queue size {raw_queue.qsize()}')
 
-            lib.trim(RAW_DATA_FILENAME, SIZE) # trim the file
+            lib.trim(RAW_DATA_FILENAME, TRIM_SIZE)
         except:
             traceback.print_exc(file=sys.stderr)
             print("top level exception",
                       sys.exc_info()[0], file=sys.stderr)
 
+def queue_writer_factory() -> lib.QueueLine:
+    return lib.QueueLine(raw_queue)
+
 # continuously read serial inputs and write to the queue
 def data_reader() -> None:
-    serials:serial.Serial = []
+    serials:ReaderThread = []
     while True:
         try:
-            # refresh after *every* row?  TODO: do this differently
-            serials = lib.refresh_serials(serials)
-            for serial in serials:
-                # read one line from serial, write to queue
-                try:
-                    line = serial.readline().rstrip()
-                    print("readline")
-                    if line:
-                        raw_queue.put(line)
-                except serial.serialutil.SerialException:
-                    print("fail", serial.s.port, file=sys.stderr)
-                    serial.s.close()
+            # TODO: catch lost connections, and use notify to catch new ttys
+            serials = lib.refresh_serials(serials, queue_writer_factory)
+            time.sleep(10)
         except:
             traceback.print_exc(file=sys.stderr)
             print("top level exception",

@@ -2,7 +2,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import serial #type:ignore
-import serial.threaded #type:ignore
+from serial.threaded import Packetizer,ReaderThread #type:ignore
 import binascii, itertools, operator, os, queue, sys, traceback
 
 from datetime import datetime
@@ -11,50 +11,20 @@ from scipy import integrate #type:ignore
 from typing import Any, Callable, Dict, IO, List, Optional, Tuple, Union
 from collections import namedtuple
 
-
-# for threaded reader, see
-# https://github.com/pyserial/pyserial/blob/master/serial/threaded/__init__.py
-# and
-# https://pythonhosted.org/pyserial/pyserial_api.html#module-serial.threaded
-
-class QueueLine(serial.threaded.Packetizer): #type:ignore
+class QueueLine(Packetizer): #type:ignore
     TERMINATOR = b'\n'
     def __init__(self, raw_queue: queue.SimpleQueue[bytes]) -> None:
         super().__init__()
         self.raw_queue = raw_queue
-    def connection_made(self, transport: serial.threading.ReaderThread) -> None:
+    def connection_made(self, transport: ReaderThread) -> None:
         print('port opened')
         super().connection_made(transport)
     def handle_packet(self, packet: bytes) -> None:
-        print(packet)
+        print(f"port {self.transport.serial.port} got packet")
         self.raw_queue.put(packet)
     def connection_lost(self, exc:Exception) -> None:
         print('port closed')
         super().connection_lost(exc)
-
-# from https://github.com/pyserial/pyserial/issues/216
-class ReadLine:
-    def __init__(self, s:serial.Serial) -> None:
-        self.buf = bytearray()
-        self.s = s
-    
-    def readline(self) -> bytes:
-        print(f'port {self.s.port} in_waiting {self.s.in_waiting}')
-        i = self.buf.find(b"\n")
-        if i >= 0:
-            r = self.buf[:i+1]
-            self.buf = self.buf[i+1:]
-            return r
-        while True:
-            i = max(1, min(2048, self.s.in_waiting))
-            data = self.s.read(i)
-            i = data.find(b"\n")
-            if i >= 0:
-                r = self.buf + data[:i+1]
-                self.buf[0:] = data[i+1:]
-                return r
-            else:
-                self.buf.extend(data)
 
 # see arduino.ino
 # TODO: use a common format somehow?
@@ -195,36 +165,34 @@ def parse(line:str) -> Optional[Dict[str, Any]]:
         return None
 
 # create new serial stream
-#def new_serial(port:str) -> serial.Serial:
-def new_serial(port:str) -> ReadLine:
+def new_serial(port:str, factory: Callable[[],QueueLine]) -> ReaderThread:
     print(f'new {port}', file=sys.stderr, flush=True)
-    return ReadLine(serial.Serial(port, 9600, 8, 'N', 1, timeout=1))
+    ser = serial.Serial(port, 9600, 8, 'N', 1, timeout=1)
+    t = ReaderThread(ser, factory)
+    t.start()
+    t.connect()
+    return t
 
-#def is_open(ser:serial.Serial) -> bool:
-def is_open(ser:ReadLine) -> bool:
-    if ser.s.is_open:
+def is_open(ser:ReaderThread) -> bool:
+    if ser.serial.is_open:
         return True
     print(f'closed {ser.s.port}', file=sys.stderr, flush=True)
     return False
 
-#def has_tty(ttys:List[str]) -> Callable[[serial.Serial], bool]:
-def has_tty(ttys:List[str]) -> Callable[[ReadLine], bool]:
-    #def f(ser:serial.Serial) -> bool:
-    def f(ser:ReadLine) -> bool:
-        if ser.s.port in ttys:
+def has_tty(ttys:List[str]) -> Callable[[ReaderThread], bool]:
+    def f(ser:ReaderThread) -> bool:
+        if ser.serial.port in ttys:
             return True
-        print(f'no tty {ser.s.port}', file=sys.stderr, flush=True)
+        print(f'no tty {ser.serial.port}', file=sys.stderr, flush=True)
         return False
     return f
 
 # this is to make mypy happy
-#def get_port(s:serial.Serial) -> str:
-def get_port(s:ReadLine) -> str:
-    port:str = s.s.port
+def get_port(s:ReaderThread) -> str:
+    port:str = s.serial.port
     return port
     
-#def no_serial(serials:List[serial.Serial]) -> Callable[[str], bool]:
-def no_serial(serials:List[ReadLine]) -> Callable[[str], bool]:
+def no_serial(serials:List[ReaderThread]) -> Callable[[str], bool]:
     current_ports:List[str] = [*map(get_port , serials)]
     def f(tty:str) -> bool:
         if tty in current_ports:
@@ -234,7 +202,8 @@ def no_serial(serials:List[ReadLine]) -> Callable[[str], bool]:
     return f
 
 # refresh the serials list with ttys
-def refresh_serials(serials:List[ReadLine])-> List[ReadLine]:
+def refresh_serials(serials:List[ReaderThread],
+                    queue_writer_factory: Callable[[],QueueLine]) -> List[ReaderThread]:
 
     # list of the ttys that exist
     ttys:List[str] = glob("/dev/ttyACM*")
@@ -244,7 +213,10 @@ def refresh_serials(serials:List[ReadLine])-> List[ReadLine]:
     serials = [*filter(lambda x: is_open(x) and has_tty(ttys)(x), serials)]
 
     # create new serials for ttys without serials
-    serials.extend([*map(new_serial, filter(no_serial(serials), ttys))])
+    ttys_needing_serials = filter(no_serial(serials), ttys)
+
+    for tty in ttys_needing_serials:
+        serials.append(new_serial(tty, queue_writer_factory))
 
     return serials
 

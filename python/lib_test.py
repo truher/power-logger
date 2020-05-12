@@ -169,23 +169,23 @@ class TestLib(unittest.TestCase):
             self.assertAlmostEqual(267.75, pwr, places=3)
             self.assertEqual(b'load5', va.load)
 
-    def test_readline(self) -> None:
-        class FakeSerial:
-            def __init__(self) -> None:
-                self.bytes = b'asdf\nqwerty\n'
-                self.in_waiting = len(self.bytes)
-                self.port = "foo"
-            def read(self, i: int) -> bytes:
-                x = self.bytes[:i]
-                self.bytes = self.bytes[i:]
-                return x
-            
-        f = FakeSerial()
-        rl = lib.ReadLine(f)
-        line = rl.readline()
-        self.assertEqual(b'asdf\n',line)
-        line = rl.readline()
-        self.assertEqual(b'qwerty\n',line)
+#    def test_readline(self) -> None:
+#        class FakeSerial:
+#            def __init__(self) -> None:
+#                self.bytes = b'asdf\nqwerty\n'
+#                self.in_waiting = len(self.bytes)
+#                self.port = "foo"
+#            def read(self, i: int) -> bytes:
+#                x = self.bytes[:i]
+#                self.bytes = self.bytes[i:]
+#                return x
+#            
+#        f = FakeSerial()
+#        rl = lib.ReadLine(f)
+#        line = rl.readline()
+#        self.assertEqual(b'asdf\n',line)
+#        line = rl.readline()
+#        self.assertEqual(b'qwerty\n',line)
 
 if __name__ == '__main__':
     unittest.main()
