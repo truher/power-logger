@@ -1,7 +1,8 @@
+from __future__ import annotations
 import numpy as np
 import pandas as pd
 import serial #type:ignore
-import csv, orjson, sys, threading, time, traceback, warnings
+import csv, orjson, queue, sys, threading, time, traceback, warnings
 from flask import Flask, Response
 from waitress import serve #type:ignore
 from typing import Any
@@ -14,6 +15,9 @@ app = Flask(__name__)
 # TODO: remove this
 rng = np.random.default_rng() #type:ignore
 
+raw_queue: queue.SimpleQueue[bytes] = queue.SimpleQueue()
+
+# arduino takes batches of 1000 points
 OBSERVATION_COUNT = 1000
 interpolator = lib.interpolator(OBSERVATION_COUNT)
 
@@ -36,25 +40,32 @@ def va_updater(va:lib.VA) -> None:
     latest_va[loadname]['x'] = va.volts
     latest_va[loadname]['y'] = va.amps
 
+transcriber = lib.transcribe(raw_queue, interpolator, va_updater)
+
 # continuously read serial inputs and write data to the raw data file 
 # TODO: move to lib
 def data_reader() -> None:
     serials:serial.Serial = []
-    # trim every 30 sec
-    freq = 30
-    # retain 15k rows (1 obs/sec, 3600 sec/h, 4h)
-    #size = 100000
-    size = 5000
+    FREQ = 30 # trim every 30 rows
+    SIZE = 5000 # size of raw file to retain
     while True:
         try:
-            print("read loop")
-            # write <freq> lines
             with open(RAW_DATA_FILENAME, 'ab') as sink:
-                transcriber = lib.transcribe(sink, interpolator, va_updater)
-                for lines in range(freq):
-                    serials = lib.transcribe_all(serials, transcriber)
+                # write <FREQ> lines
+                for lines in range(FREQ):
+                    #time.sleep(2) # this should fall behind
+                    # refresh after *every* row?  TODO: do this differently
+                    serials = lib.refresh_serials(serials)
+                    for serial in serials:
+                        transcriber(serial)
+                        payload = raw_queue.get()
+                        if payload: # could be None
+                            sink.write(payload)
+                            sink.write(b'\n')
+                            sink.flush()
+                    #[*map(transcriber, serials)]
             # trim the file
-            lib.trim(RAW_DATA_FILENAME, size) 
+            lib.trim(RAW_DATA_FILENAME, SIZE) 
         except:
             traceback.print_exc(file=sys.stderr)
             print("top level exception",

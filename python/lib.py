@@ -1,13 +1,39 @@
+from __future__ import annotations
 import numpy as np
 import pandas as pd
 import serial #type:ignore
-import binascii, itertools, operator, os, sys
+import binascii, itertools, operator, os, queue, sys
 
 from datetime import datetime
 from glob import glob
 from scipy import integrate #type:ignore
 from typing import Any, Callable, Dict, IO, List, Optional, Tuple, Union
 from collections import namedtuple
+
+
+# from https://github.com/pyserial/pyserial/issues/216
+class ReadLine:
+    def __init__(self, s:serial.Serial) -> None:
+        self.buf = bytearray()
+        self.s = s
+    
+    def readline(self) -> bytes:
+        print(f'port {self.s.port} in_waiting {self.s.in_waiting}')
+        i = self.buf.find(b"\n")
+        if i >= 0:
+            r = self.buf[:i+1]
+            self.buf = self.buf[i+1:]
+            return r
+        while True:
+            i = max(1, min(2048, self.s.in_waiting))
+            data = self.s.read(i)
+            i = data.find(b"\n")
+            if i >= 0:
+                r = self.buf + data[:i+1]
+                self.buf[0:] = data[i+1:]
+                return r
+            else:
+                self.buf.extend(data)
 
 # see arduino.ino
 # TODO: use a common format somehow?
@@ -107,14 +133,19 @@ VA = namedtuple('VA', ['load','volts','amps'])
 # read a line from source (unparsed), prepend timestamp, write it to sink
 # close the source if something goes wrong
 # so now the raw data is not worth keeping
-def transcribe(sink: IO[bytes],
+# TODO: write it to the queue instead of the sink
+#def transcribe(sink: IO[bytes],
+def transcribe(sink_queue: queue.SimpleQueue[bytes],
                interpolator: Callable[[List[int]],List[int]],
-               va_updater: Callable[[VA], None]) -> Callable[[IO[bytes]],None]:
-    def f(source:serial.Serial)->None:
+               #va_updater: Callable[[VA], None]) -> Callable[[IO[bytes]],None]:
+               va_updater: Callable[[VA], None]) -> Callable[[ReadLine],None]:
+    #def f(source:serial.Serial)->None:
+    def f(source:ReadLine)->None:
         try:
             #line = source.readline().rstrip().decode('ascii')
             line = source.readline().rstrip()
             print("readline")
+            #print(line)
             if line:
                 #now = datetime.now().isoformat(timespec='microseconds')
                 now = datetime.now().isoformat(timespec='microseconds').encode('ascii')
@@ -128,13 +159,20 @@ def transcribe(sink: IO[bytes],
                     va_updater(va)
                     pwr = average_power_watts(va.volts, va.amps)
                     real_old_format_line = f"{now.decode('ascii')}\t{va.load.decode('ascii')}\t{pwr}"
-                    sink.write(real_old_format_line.encode('ascii'))
-                    sink.write(b'\n')
-                    sink.flush()
+                    # TODO: remove this newline
+                    #sink_queue.put(real_old_format_line.encode('ascii') + b'\n')
+                    sink_queue.put(real_old_format_line.encode('ascii'))
+                    #sink.write(real_old_format_line.encode('ascii'))
+                    #sink.write(b'\n')
+                    #sink.flush()
+                else:
+                    # TODO: remove this
+                    # to keep the queue consumer from getting stuck
+                    sink_queue.put(None)
 
         except serial.serialutil.SerialException:
-            print("fail", source.port, file=sys.stderr)
-            source.close()
+            print("fail", source.s.port, file=sys.stderr)
+            source.s.close()
     return f
 
 # trim file <filename> to latest <count> lines
@@ -175,34 +213,40 @@ def parse(line:str) -> Optional[Dict[str, Any]]:
         return result
 
     except ValueError:
-        print(f'ignore broken line: {line}', file=sys.stderr)
+        print(f'parse ignore broken line: {line}', file=sys.stderr)
         return None
 
 # create new serial stream
-def new_serial(port:str) -> serial.Serial:
+#def new_serial(port:str) -> serial.Serial:
+def new_serial(port:str) -> ReadLine:
     print(f'new {port}', file=sys.stderr, flush=True)
-    return serial.Serial(port, 9600, 8, 'N', 1, timeout=1)
+    return ReadLine(serial.Serial(port, 9600, 8, 'N', 1, timeout=1))
 
-def is_open(ser:serial.Serial) -> bool:
-    if ser.is_open:
+#def is_open(ser:serial.Serial) -> bool:
+def is_open(ser:ReadLine) -> bool:
+    if ser.s.is_open:
         return True
-    print(f'closed {ser.port}', file=sys.stderr, flush=True)
+    print(f'closed {ser.s.port}', file=sys.stderr, flush=True)
     return False
 
-def has_tty(ttys:List[str]) -> Callable[[serial.Serial], bool]:
-    def f(ser:serial.Serial) -> bool:
-        if ser.port in ttys:
+#def has_tty(ttys:List[str]) -> Callable[[serial.Serial], bool]:
+def has_tty(ttys:List[str]) -> Callable[[ReadLine], bool]:
+    #def f(ser:serial.Serial) -> bool:
+    def f(ser:ReadLine) -> bool:
+        if ser.s.port in ttys:
             return True
-        print(f'no tty {ser.port}', file=sys.stderr, flush=True)
+        print(f'no tty {ser.s.port}', file=sys.stderr, flush=True)
         return False
     return f
 
 # this is to make mypy happy
-def get_port(s:serial.Serial) -> str:
-    port:str = s.port
+#def get_port(s:serial.Serial) -> str:
+def get_port(s:ReadLine) -> str:
+    port:str = s.s.port
     return port
     
-def no_serial(serials:List[serial.Serial]) -> Callable[[str], bool]:
+#def no_serial(serials:List[serial.Serial]) -> Callable[[str], bool]:
+def no_serial(serials:List[ReadLine]) -> Callable[[str], bool]:
     current_ports:List[str] = [*map(get_port , serials)]
     def f(tty:str) -> bool:
         if tty in current_ports:
@@ -211,15 +255,25 @@ def no_serial(serials:List[serial.Serial]) -> Callable[[str], bool]:
         return True
     return f
 
-# maintain connections and transcribe them all
-# TODO: stop constructing the transcriber every time, pass it in.
-# TODO: test this
-def transcribe_all(serials:List[serial.Serial],
-        transcriber: Callable[[IO[bytes]],None])-> List[serial.Serial]:
+#def transcribe_all(serials:List[serial.Serial],
+#def transcribe_all(serials:List[ReadLine],
+# refresh the serials list with ttys
+def refresh_serials(serials:List[ReadLine])-> List[ReadLine]:
+        #transcriber: Callable[[IO[bytes]],None])-> List[serial.Serial]:
+        #transcriber: Callable[[ReadLine],None])-> List[ReadLine]:
+
+    # list of the ttys that exist
     ttys:List[str] = glob("/dev/ttyACM*")
+
+    # keep the list of serial ports that are open and that match a tty
+    # TODO: replace is_open with the threaded connection_lost method?
     serials = [*filter(lambda x: is_open(x) and has_tty(ttys)(x), serials)]
+
+    # create new serials for ttys without serials
     serials.extend([*map(new_serial, filter(no_serial(serials), ttys))])
-    [*map(transcriber, serials)]
+
+    # for each serial, copy one line
+    #[*map(transcriber, serials)]
     return serials
 
 # read the whole file into a list of lines
@@ -260,7 +314,7 @@ def bytes_to_array(interpolator:Callable[[List[int]],List[int]],
         return interpolated
     except (IndexError, TypeError, ValueError) as error:
         print(error)
-        print(f'ignore broken line: {all_fields}', file=sys.stderr)
+        print(f'bytes_to_array ignore broken line: {all_fields}', file=sys.stderr)
         return None
 
 # input: fields from arduino, WITHOUT the time stamp
@@ -270,6 +324,7 @@ def goodrow(x:List[bytes]) -> bool:
         return False
     if len(x) != 8:
         print(f'skip row len {len(x)}')
+        print(x)
         return False
     if x[1] != b'0':
         print(f'skip row err {x[1]!r}')
@@ -320,25 +375,4 @@ def decode_and_interpolate(interpolator:Callable[[List[int]],List[int]],
 def average_power_watts(volts: List[int], amps: List[int]) -> int:
     return np.average(np.multiply(volts, amps)) #type:ignore
 
-# from https://github.com/pyserial/pyserial/issues/216
-class ReadLine:
-    def __init__(self, s):
-        self.buf = bytearray()
-        self.s = s
-    
-    def readline(self):
-        i = self.buf.find(b"\n")
-        if i >= 0:
-            r = self.buf[:i+1]
-            self.buf = self.buf[i+1:]
-            return r
-        while True:
-            i = max(1, min(2048, self.s.in_waiting))
-            data = self.s.read(i)
-            i = data.find(b"\n")
-            if i >= 0:
-                r = self.buf + data[:i+1]
-                self.buf[0:] = data[i+1:]
-                return r
-            else:
-                self.buf.extend(data)
+

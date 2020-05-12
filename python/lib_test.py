@@ -1,4 +1,5 @@
-import io, lib, unittest
+from __future__ import annotations
+import io, lib, queue, unittest
 import numpy as np
 from typing import IO,List
 
@@ -24,13 +25,16 @@ class TestLib(unittest.TestCase):
         def v(va:lib.VA) -> None:
             pass
         #sink = io.StringIO()
-        sink = io.BytesIO()
+        #sink = io.BytesIO()
+        sink: queue.SimpleQueue[bytes] = queue.SimpleQueue()
         i = lib.interpolator(5)
         f = lib.transcribe(sink, i, v)
         source:IO[bytes] = io.BytesIO(b'0 5701333034370A220D ct1 10 8081818181 20 8081818181')
-        f(source)
-        content:bytes = sink.getvalue()
-        self.assertEqual(b"load5\t267.75\n", content[-13:])
+        f(source) #type:ignore
+        #content:bytes = sink.getvalue()
+        content:bytes = sink.get()
+        #self.assertEqual(b"load5\t267.75\n", content[-13:])
+        self.assertEqual(b"load5\t267.75", content[-12:])
 
     def test_io_write_str(self) -> None:
         output = io.StringIO()
@@ -163,13 +167,15 @@ class TestLib(unittest.TestCase):
 
     def test_readline(self) -> None:
         class FakeSerial:
-            def __init__(self):
+            def __init__(self) -> None:
                 self.bytes = b'asdf\nqwerty\n'
                 self.in_waiting = len(self.bytes)
-            def read(self, i):
+                self.port = "foo"
+            def read(self, i: int) -> bytes:
                 x = self.bytes[:i]
                 self.bytes = self.bytes[i:]
                 return x
+            
         f = FakeSerial()
         rl = lib.ReadLine(f)
         line = rl.readline()
