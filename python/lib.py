@@ -151,22 +151,7 @@ def make_hourly(raw_data:pd.DataFrame) -> pd.DataFrame:
 # in order to pass null
 VA = namedtuple('VA', ['load','volts','amps'])   
 
-# read a line from source (unparsed), prepend timestamp, write it to sink
-# close the source if something goes wrong
-# so now the raw data is not worth keeping
-# TODO: write it to the queue instead of the sink
-def transcribe(sink_queue: queue.SimpleQueue[bytes]) -> Callable[[ReadLine],None]:
-    #def f(source:serial.Serial)->None:
-    def f(source:ReadLine)->None:
-        try:
-            line = source.readline().rstrip()
-            print("readline")
-            if line:
-                sink_queue.put(line)
-        except serial.serialutil.SerialException:
-            print("fail", source.s.port, file=sys.stderr)
-            source.s.close()
-    return f
+
 
 # trim file <filename> to latest <count> lines
 # TODO: use a circular mmap instead
@@ -248,12 +233,8 @@ def no_serial(serials:List[ReadLine]) -> Callable[[str], bool]:
         return True
     return f
 
-#def transcribe_all(serials:List[serial.Serial],
-#def transcribe_all(serials:List[ReadLine],
 # refresh the serials list with ttys
 def refresh_serials(serials:List[ReadLine])-> List[ReadLine]:
-        #transcriber: Callable[[IO[bytes]],None])-> List[serial.Serial]:
-        #transcriber: Callable[[ReadLine],None])-> List[ReadLine]:
 
     # list of the ttys that exist
     ttys:List[str] = glob("/dev/ttyACM*")
@@ -265,8 +246,6 @@ def refresh_serials(serials:List[ReadLine])-> List[ReadLine]:
     # create new serials for ttys without serials
     serials.extend([*map(new_serial, filter(no_serial(serials), ttys))])
 
-    # for each serial, copy one line
-    #[*map(transcriber, serials)]
     return serials
 
 # read the whole file into a list of lines
