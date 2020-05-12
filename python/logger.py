@@ -16,7 +16,7 @@ app = Flask(__name__)
 # TODO: remove this
 rng = np.random.default_rng() #type:ignore
 
-raw_queue: queue.SimpleQueue[Optional[bytes]] = queue.SimpleQueue()
+raw_queue: queue.SimpleQueue[bytes] = queue.SimpleQueue()
 
 # arduino takes batches of 1000 points
 OBSERVATION_COUNT = 1000
@@ -41,7 +41,6 @@ def va_updater(va:lib.VA) -> None:
     latest_va[loadname]['x'] = va.volts
     latest_va[loadname]['y'] = va.amps
 
-transcriber = lib.transcribe(raw_queue, interpolator, va_updater)
 
 FREQ = 30 # trim every 30 rows
 SIZE = 5000 # size of raw file to retain
@@ -53,48 +52,25 @@ def data_writer() -> None:
         try:
             with open(RAW_DATA_FILENAME, 'ab') as sink:
                 for lines in range(FREQ): # write <FREQ> lines
+
                     #time.sleep(2) # this should fall behind
-                    #payload = raw_queue.get()
                     line = raw_queue.get()
-                    # payload is old format line
-                    # make it raw input
-                    #if payload: # could be None
-                    if line: # could be None
+                    now = datetime.now().isoformat(timespec='microseconds').encode('ascii')
 
-                        #now = datetime.now().isoformat(timespec='microseconds')
-                        now = datetime.now().isoformat(timespec='microseconds').encode('ascii')
+                    # TODO fix the format
+                    #old_format_line = f'{now} {line}'
+                    old_format_line = now + b' ' + line
 
-                        # TODO fix the format
-                        #old_format_line = f'{now} {line}'
-                        old_format_line = now + b' ' + line
-
-                        va = lib.decode_and_interpolate(interpolator, old_format_line)
-                        if va:
-                            va_updater(va)
-                            pwr = lib.average_power_watts(va.volts, va.amps)
-                            real_old_format_line = f"{now.decode('ascii')}\t{va.load.decode('ascii')}\t{pwr}"
-                            # TODO: remove this newline
-                            #sink_queue.put(real_old_format_line.encode('ascii') + b'\n')
-                            #sink_queue.put(real_old_format_line.encode('ascii'))
-
-                            sink.write(real_old_format_line.encode('ascii'))
-                            sink.write(b'\n')
-                            sink.flush()
-                        #else:
-                        #    # TODO: remove this
-                        #    # to keep the queue consumer from getting stuck
-                        #    sink_queue.put(None)
-
-
-
-
-
-
-
-                        #sink.write(payload)
-                        #sink.write(b'\n')
-                        #sink.flush()
+                    va = lib.decode_and_interpolate(interpolator, old_format_line)
+                    if va:
+                        va_updater(va)
+                        pwr = lib.average_power_watts(va.volts, va.amps)
+                        real_old_format_line = f"{now.decode('ascii')}\t{va.load.decode('ascii')}\t{pwr}"
+                        sink.write(real_old_format_line.encode('ascii'))
+                        sink.write(b'\n')
+                        sink.flush()
                         print(f'queue size {raw_queue.qsize()}')
+
             lib.trim(RAW_DATA_FILENAME, SIZE) # trim the file
         except:
             traceback.print_exc(file=sys.stderr)
@@ -110,7 +86,14 @@ def data_reader() -> None:
             serials = lib.refresh_serials(serials)
             for serial in serials:
                 # read one line from serial, write to queue
-                transcriber(serial)
+                try:
+                    line = serial.readline().rstrip()
+                    print("readline")
+                    if line:
+                        raw_queue.put(line)
+                except serial.serialutil.SerialException:
+                    print("fail", serial.s.port, file=sys.stderr)
+                    serial.s.close()
         except:
             traceback.print_exc(file=sys.stderr)
             print("top level exception",

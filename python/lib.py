@@ -155,48 +155,14 @@ VA = namedtuple('VA', ['load','volts','amps'])
 # close the source if something goes wrong
 # so now the raw data is not worth keeping
 # TODO: write it to the queue instead of the sink
-#def transcribe(sink: IO[bytes],
-def transcribe(sink_queue: queue.SimpleQueue[Optional[bytes]],
-               interpolator: Callable[[List[int]],List[int]],
-               #va_updater: Callable[[VA], None]) -> Callable[[IO[bytes]],None]:
-               va_updater: Callable[[VA], None]) -> Callable[[ReadLine],None]:
+def transcribe(sink_queue: queue.SimpleQueue[bytes]) -> Callable[[ReadLine],None]:
     #def f(source:serial.Serial)->None:
     def f(source:ReadLine)->None:
         try:
-            #line = source.readline().rstrip().decode('ascii')
             line = source.readline().rstrip()
             print("readline")
-            #print(line)
             if line:
-
                 sink_queue.put(line)
-
-
-
-
-#                #now = datetime.now().isoformat(timespec='microseconds')
-#                now = datetime.now().isoformat(timespec='microseconds').encode('ascii')
-#
-#                # TODO fix the format
-#                #old_format_line = f'{now} {line}'
-#                old_format_line = now + b' ' + line
-#
-#                va = decode_and_interpolate(interpolator, old_format_line)
-#                if va:
-#                    va_updater(va)
-#                    pwr = average_power_watts(va.volts, va.amps)
-#                    real_old_format_line = f"{now.decode('ascii')}\t{va.load.decode('ascii')}\t{pwr}"
-#                    # TODO: remove this newline
-#                    #sink_queue.put(real_old_format_line.encode('ascii') + b'\n')
-#                    sink_queue.put(real_old_format_line.encode('ascii'))
-#                    #sink.write(real_old_format_line.encode('ascii'))
-#                    #sink.write(b'\n')
-#                    #sink.flush()
-#                else:
-#                    # TODO: remove this
-#                    # to keep the queue consumer from getting stuck
-#                    sink_queue.put(None)
-
         except serial.serialutil.SerialException:
             print("fail", source.s.port, file=sys.stderr)
             source.s.close()
