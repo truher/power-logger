@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import serial #type:ignore
 from serial.threaded import Packetizer,ReaderThread #type:ignore
-import binascii, itertools, operator, os, queue, sys, traceback
+import binascii, itertools, operator, os, queue, sys, time, traceback
 
 from datetime import datetime
 from glob import glob
@@ -13,18 +13,31 @@ from collections import namedtuple
 
 class QueueLine(Packetizer): #type:ignore
     TERMINATOR = b'\n'
+    SLEEP_TIME = 0.05 # reduce the spinning in a very simple way
     def __init__(self, raw_queue: queue.SimpleQueue[bytes]) -> None:
         super().__init__()
         self.raw_queue = raw_queue
+        self.buffers_per_line = 0
     def connection_made(self, transport: ReaderThread) -> None:
         print('port opened')
         super().connection_made(transport)
     def handle_packet(self, packet: bytes) -> None:
-        print(f"port {self.transport.serial.port} got packet")
+        #print(f"{datetime.now()} port {self.transport.serial.port} line {len(packet)} buffers per line  {self.buffers_per_line}")
+        self.buffers_per_line = 0
         self.raw_queue.put(packet)
     def connection_lost(self, exc:Exception) -> None:
         print('port closed')
         super().connection_lost(exc)
+    def data_received(self, data):
+        # overrides Packetizer.data_received
+        #print(f'{datetime.now()} port {self.transport.serial.port} data buffer {len(self.buffer)} new len {len(data)}')
+        self.buffers_per_line += 1
+        self.buffer.extend(data)
+        while self.TERMINATOR in self.buffer:
+            packet, self.buffer = self.buffer.split(self.TERMINATOR, 1)
+            self.handle_packet(packet)
+        # sleep immediately *after* handling the packet to avoid harming latency
+        time.sleep(self.SLEEP_TIME)
 
 # see arduino.ino
 # TODO: use a common format somehow?
@@ -126,7 +139,7 @@ VA = namedtuple('VA', ['load','volts','amps'])
 # trim file <filename> to latest <count> lines
 # TODO: use a circular mmap instead
 def trim(filename:str, count:int) -> None:
-    print("trim")
+    #print("trim")
     lines = []
     with open(filename, 'rb') as source:
         lines = source.readlines()
@@ -167,7 +180,7 @@ def parse(line:str) -> Optional[Dict[str, Any]]:
 # create new serial stream
 def new_serial(port:str, factory: Callable[[],QueueLine]) -> ReaderThread:
     print(f'new {port}', file=sys.stderr, flush=True)
-    ser = serial.Serial(port, 9600, 8, 'N', 1, timeout=1)
+    ser = serial.Serial(port, 115200, 8, 'N', 1, timeout=1)
     t = ReaderThread(ser, factory)
     t.start()
     t.connect()
@@ -210,6 +223,7 @@ def refresh_serials(serials:List[ReaderThread],
 
     # keep the list of serial ports that are open and that match a tty
     # TODO: replace is_open with the threaded connection_lost method?
+    # TODO: dispose of the broken ones somehow?
     serials = [*filter(lambda x: is_open(x) and has_tty(ttys)(x), serials)]
 
     # create new serials for ttys without serials

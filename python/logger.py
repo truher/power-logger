@@ -36,7 +36,7 @@ latest_va = {'load1': randxy,
 
 def va_updater(va:lib.VA) -> None:
     loadname = va.load.decode('ascii')
-    print(f"update {loadname}")
+    #print(f"update {loadname}")
     if va.load not in latest_va:
         latest_va[loadname] = {'x':[],'y':[]}
     latest_va[loadname]['x'] = va.volts
@@ -70,7 +70,7 @@ def data_writer() -> None:
                         sink.write(real_old_format_line.encode('ascii'))
                         sink.write(b'\n')
                         sink.flush()
-                        print(f'queue size {raw_queue.qsize()}')
+                        #print(f'queue size {raw_queue.qsize()}')
 
             lib.trim(RAW_DATA_FILENAME, TRIM_SIZE)
         except:
