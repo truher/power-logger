@@ -3,50 +3,8 @@
 <script src="https://unpkg.com/d3/dist/d3.js"></script>
 <script src="https://unpkg.com/d3fc/build/d3fc.js"></script>
 <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=">
-<style>
-body {
-    color: #1b1e23;
-    font-size: small;
-    font-family: sans-serif;
-    height: calc(100vh - 2em);
-    margin: 1em;
-    display: flex;
-}
+<link rel="stylesheet" href="/static/common.css">
 
-body > * {
-    flex: auto;
-}
-
-.domain, .gridline-y, .gridline-x, .annotation-line>line {
-    stroke: currentColor;
-    stroke-opacity: 0.1;
-}
-
-  .area {
-    fill: #cec6b9;
-  }
-  #small-multiples > div {
-    display: inline-block;
-    width: 250px;
-    height: 250px;
-  }
-  .x-axis .domain, .x-axis .tick path,
-  .y-axis .domain, .y-axis .tick path {
-    display: none;
-  }
-  .x-axis {
-    height: 1.5em !important;
-  }
-  .gridline-x {
-    stroke: white;
-  }
-  d3fc-group.cartesian-chart > .x-label { font-size: 12px; }
-  d3fc-group.cartesian-chart > .y-label { font-size: 12px; }
-  d3fc-group.cartesian-chart .tick { font-size: 10px; }
-  d3fc-group.cartesian-chart .tick { font-size: 10px; }
-  d3fc-group.cartesian-chart > .chart-label { font-size: 16px; }
-  div#instance { margin: 12px; }
-</style>
 <d3fc-group id='small-multiples'></d3fc-group>
 <script>
 const xScale = d3.scaleLinear().domain([-1, 1024]);
@@ -101,6 +59,4 @@ d3.select(container)
 container.requestRedraw();
 
 setInterval(() => {container.requestRedraw();}, 500);
-
-
 </script>

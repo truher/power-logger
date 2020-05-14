@@ -1,0 +1,17 @@
+/* common css */
+.x-axis {
+  height: 1.5em;
+}
+.chart d3fc-svg { /* raw and summary charts */
+  display: block;
+  height: 250px;
+}
+.line {
+  stroke: inherit; /* series color */
+}
+#small-multiples > div { /* logger */
+  display: inline-block;
+  width: 25%;
+  height: 250px;
+  margin: 0;
+}
