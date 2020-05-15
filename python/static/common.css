@@ -1,23 +1,30 @@
-/* common css */
 .x-axis {
   height: 1.5em;
 }
-.chart d3fc-svg { /* raw and summary charts */
+
+/* raw and summary charts */
+.chart d3fc-svg {
   display: block;
   height: 250px;
 }
+
+/* series color */
 .line {
-  stroke: inherit; /* series color */
+  stroke: inherit;
 }
-#small-multiples > div { /* logger */
+
+/* logger */
+#small-multiples>div {
   display: inline-block;
   width: 25%;
   height: 250px;
   margin: 0;
 }
-#timeseries > div { /* logger */
+
+/* logger */
+#timeseries>div {
   display: block;
-  /*width: 100%;*/
   height: 250px;
   margin: 0;
 }
+
