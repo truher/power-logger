@@ -131,6 +131,7 @@ def make_hourly(raw_data:pd.DataFrame) -> pd.DataFrame:
         loffset='-1H').max().diff().dropna().iloc[1:]
     return hourly #type:ignore
 
+# TODO: add power here
 # in order to pass null
 VA = namedtuple('VA', ['load','volts','amps'])   
 
@@ -328,6 +329,7 @@ def decode_and_interpolate(interpolator:Callable[[List[int]],List[int]],
 
     return VA(load_name,volts, amps)
 
+# TODO: add the multiply to VA
 # input: observations (volts, amps)
 # output: average power in watts
 def average_power_watts(volts: List[int], amps: List[int]) -> int:

@@ -131,15 +131,27 @@ def index() -> Any:
     print('index')
     return app.send_static_file('index.html')
 
+# TODO: serve these using send_from_directory
 @app.route('/logger')
 def logger() -> Any:
     print('logger')
     return app.send_static_file('logger.html')
 
+@app.route('/timeseries')
+def timeseries() -> Any:
+    print('timeseries')
+    return app.send_static_file('timeseries.html')
+
 @app.route('/raw')
 def raw() -> Any:
     print('raw')
     return app.send_static_file('raw.html')
+
+@app.route('/summary')
+def summary() -> Any:
+    print('summary')
+    return app.send_static_file('summary.html')
+
 
 @app.route('/rawdata')
 def rawdata() -> Any:
@@ -148,17 +160,27 @@ def rawdata() -> Any:
     json_payload = orjson.dumps(raw_data.to_records().tolist()) #type:ignore
     return Response(json_payload, mimetype='application/json')
 
-@app.route('/summary')
-def summary() -> Any:
-    print('summary')
-    return app.send_static_file('summary.html')
-
-
 @app.route('/summarydata')
 def summarydata() -> Any:
     print('summarydata')
     hourly = lib.read_hourly_no_header(HOURLY_DATA_FILENAME)
     json_payload = orjson.dumps(hourly.to_records().tolist()) #type:ignore
+    return Response(json_payload, mimetype='application/json')
+
+@app.route('/timeseriesdata')
+def timeseriesdata() -> Any:
+    print('data')
+    loads = ['load1','load2','load3','load4',
+             'load5','load6','load7','load8']
+    loadlist = [{'label':load,
+                 'x':latest_va[load]['x'],
+                 'y':latest_va[load]['y']}
+                 for load in latest_va.keys()]   
+                 #for load in random.sample(loads, len(loads))]   
+    # drop some rows to test the js rendering
+    #loadlist = loadlist[3:]
+    json_payload = orjson.dumps(loadlist,
+                                option=orjson.OPT_SERIALIZE_NUMPY)
     return Response(json_payload, mimetype='application/json')
 
 @app.route('/data')
