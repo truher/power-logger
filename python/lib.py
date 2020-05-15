@@ -28,13 +28,13 @@ class QueueLine(Packetizer): #type:ignore
     def connection_lost(self, exc:Exception) -> None:
         print('port closed')
         super().connection_lost(exc)
-    def data_received(self, data):
+    def data_received(self, data:bytes) -> None:
         # overrides Packetizer.data_received
         #print(f'{datetime.now()} port {self.transport.serial.port} data buffer {len(self.buffer)} new len {len(data)}')
         self.buffers_per_line += 1
-        self.buffer.extend(data)
-        while self.TERMINATOR in self.buffer:
-            packet, self.buffer = self.buffer.split(self.TERMINATOR, 1)
+        self.buffer.extend(data) #type:ignore
+        while self.TERMINATOR in self.buffer: #type:ignore
+            packet, self.buffer = self.buffer.split(self.TERMINATOR, 1) #type:ignore
             self.handle_packet(packet)
         # sleep immediately *after* handling the packet to avoid harming latency
         time.sleep(self.SLEEP_TIME)

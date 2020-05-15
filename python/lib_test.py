@@ -3,8 +3,6 @@ import io, lib, queue, unittest
 import numpy as np
 from typing import IO,List,Optional
 
-# show how to do a unittest of a naked function
-
 class TestLib(unittest.TestCase):
     def test_parse(self) -> None:
         self.assertIsNone(lib.parse(""))
@@ -16,29 +14,11 @@ class TestLib(unittest.TestCase):
             "2020-04-18T17:04:27.322422 abcdefghijklmnopqr xyz d"))
         x = lib.parse(
             "2020-04-18T17:04:27.322422 abcdefghijklmnopqr xyz 1.0")
-        self.assertEqual("2020-04-18 17:04:27.322422", str(x['time'])) #type:ignore
+        self.assertEqual("2020-04-18 17:04:27.322422",
+                         str(x['time'])) #type:ignore
         self.assertEqual("abcdefghijklmnopqr", x['id']) #type:ignore
         self.assertEqual("xyz", x['ct']) #type:ignore
         self.assertAlmostEqual(1.0, x['measure'], 3) #type:ignore
-
-#    def test_transcribe(self) -> None:
-#        #def v(va:lib.VA) -> None:
-#            #pass
-#        #sink = io.StringIO()
-#        #sink = io.BytesIO()
-#        sink: queue.SimpleQueue[bytes] = queue.SimpleQueue()
-#        #i = lib.interpolator(5)
-#        f = lib.transcribe(sink)
-#        payload = b'0 5701333034370A220D ct1 10 8081818181 20 8081818181'
-#        source:IO[bytes] = io.BytesIO(payload)
-#        f(source) #type:ignore
-#        #content:bytes = sink.getvalue()
-#        content:Optional[bytes] = sink.get()
-#        self.assertIsNotNone(content)
-#        if content:
-#            #self.assertEqual(b"load5\t267.75\n", content[-13:])
-#            #self.assertEqual(b"load5\t267.75", content[-12:])
-#            self.assertEqual(payload, content)
 
     def test_io_write_str(self) -> None:
         output = io.StringIO()
@@ -67,17 +47,17 @@ class TestLib(unittest.TestCase):
         self.assertFalse(buf.readline())
 
     def test_read_raw_no_header(self) -> None:
-        raw_data = lib.read_raw_no_header('test_data_multi.csv')
+        raw_data = lib.read_raw_no_header('test_kwh.csv')
         self.assertEqual(24, len(raw_data))
         self.assertCountEqual(['load','measure'], list(raw_data.columns))
 
     def test_make_multi_hourly(self) -> None:
-        load_data = lib.read_raw_no_header('test_data_multi.csv')
+        load_data = lib.read_raw_no_header('test_kwh.csv')
         hourly = lib.make_multi_hourly(load_data)
         self.assertEqual(16, len(hourly),'one per load plus total')
 
     def test_make_hourly(self) -> None:
-        load_data = lib.read_raw_no_header('test_data_multi.csv')
+        load_data = lib.read_raw_no_header('test_kwh.csv')
         hourly = lib.make_hourly(
                  load_data[load_data['load']=='load1'][['measure']])
         self.assertEqual(1, len(hourly), 'all data is in 14:00')
@@ -85,11 +65,11 @@ class TestLib(unittest.TestCase):
             places=7, msg='total is 0.0001667')
 
     def test_readfile(self) -> None:
-        raw_data = lib.readfile('new_raw.csv')
+        raw_data = lib.readfile('test_vi.csv')
         self.assertEqual(1, len(raw_data))
 
     def test_read_new_raw(self) -> None:
-        raw_data = lib.read_new_raw('new_raw.csv')
+        raw_data = lib.read_new_raw('test_vi.csv')
         self.assertEqual(1, len(raw_data))
 
     def test_bytes_to_array(self) -> None:
@@ -140,13 +120,16 @@ class TestLib(unittest.TestCase):
         # volts:      10.5 11.0 11.5 12.0 12.5 13.0 13.5 14.0
         # amps:       20.0 20.5 21.0 21.5 22.0 22.5 23.0 23.5
         # 
-        va = lib.decode_and_interpolate(i, b'x 0 5701333034370A220D ct1 10 8081818181 20 8081818181')
+        va = lib.decode_and_interpolate(i,
+            b'x 0 5701333034370A220D ct1 10 8081818181 20 8081818181')
         self.assertIsNotNone(va)
         if va: # this is for mypy
             self.assertEqual(8, len(va.volts))
             self.assertEqual(8, len(va.amps))
-            self.assertCountEqual([10.5,11.0,11.5,12.0,12.5,13.0,13.5,14.0], va.volts)
-            self.assertCountEqual([20.0,20.5,21.0,21.5,22.0,22.5,23.0,23.5], va.amps)
+            self.assertCountEqual([10.5,11.0,11.5,12.0,12.5,13.0,13.5,14.0],
+                                  va.volts)
+            self.assertCountEqual([20.0,20.5,21.0,21.5,22.0,22.5,23.0,23.5],
+                                  va.amps)
 
     def test_average_power_watts(self) -> None:
         # one constant volt * one constant amp = one constant watt
@@ -155,37 +138,21 @@ class TestLib(unittest.TestCase):
 
         # one volt AC * one amp AC = 0.5W
         # (max amplitude, not RMS)
-        pwrp = lib.average_power_watts(np.sin(np.linspace(0,999,1000)), #type:ignore
-                                       np.sin(np.linspace(0,999,1000))) #type:ignore
+        pwrp = lib.average_power_watts(
+            np.sin(np.linspace(0,999,1000)), #type:ignore
+            np.sin(np.linspace(0,999,1000))) #type:ignore
         self.assertAlmostEqual(0.5, pwrp, places=3)
 
     def test_interpolation_and_power(self) -> None:
         i = lib.interpolator(5)
         # same as above
-        va = lib.decode_and_interpolate(i, b'x 0 5701333034370A220D ct1 10 8081818181 20 8081818181')
+        va = lib.decode_and_interpolate(i,
+            b'x 0 5701333034370A220D ct1 10 8081818181 20 8081818181')
         self.assertIsNotNone(va)
         if va: # this is for mypy
             pwr = lib.average_power_watts(va.volts, va.amps)
             self.assertAlmostEqual(267.75, pwr, places=3)
             self.assertEqual(b'load5', va.load)
-
-#    def test_readline(self) -> None:
-#        class FakeSerial:
-#            def __init__(self) -> None:
-#                self.bytes = b'asdf\nqwerty\n'
-#                self.in_waiting = len(self.bytes)
-#                self.port = "foo"
-#            def read(self, i: int) -> bytes:
-#                x = self.bytes[:i]
-#                self.bytes = self.bytes[i:]
-#                return x
-#            
-#        f = FakeSerial()
-#        rl = lib.ReadLine(f)
-#        line = rl.readline()
-#        self.assertEqual(b'asdf\n',line)
-#        line = rl.readline()
-#        self.assertEqual(b'qwerty\n',line)
 
 if __name__ == '__main__':
     unittest.main()
