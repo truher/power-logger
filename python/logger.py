@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import serial #type:ignore
 from serial.threaded import ReaderThread #type:ignore
-import csv, orjson, queue, sys, threading, time, traceback, warnings
+import csv, json, queue, sys, threading, time, traceback, warnings
 from flask import Flask, Response
 from waitress import serve #type:ignore
 from typing import Any,Optional
@@ -157,14 +157,14 @@ def summary() -> Any:
 def rawdata() -> Any:
     print('rawdata')
     raw_data = lib.read_raw_no_header(RAW_DATA_FILENAME)
-    json_payload = orjson.dumps(raw_data.to_records().tolist()) #type:ignore
+    json_payload = json.dumps(raw_data.to_records().tolist()) #type:ignore
     return Response(json_payload, mimetype='application/json')
 
 @app.route('/summarydata')
 def summarydata() -> Any:
     print('summarydata')
     hourly = lib.read_hourly_no_header(HOURLY_DATA_FILENAME)
-    json_payload = orjson.dumps(hourly.to_records().tolist()) #type:ignore
+    json_payload = json.dumps(hourly.to_records().tolist()) #type:ignore
     return Response(json_payload, mimetype='application/json')
 
 @app.route('/timeseriesdata')
@@ -173,14 +173,10 @@ def timeseriesdata() -> Any:
     loads = ['load1','load2','load3','load4',
              'load5','load6','load7','load8']
     loadlist = [{'label':load,
-                 'x':latest_va[load]['x'],
-                 'y':latest_va[load]['y']}
+                 'x':latest_va[load]['x'].tolist(),
+                 'y':latest_va[load]['y'].tolist()}
                  for load in latest_va.keys()]   
-                 #for load in random.sample(loads, len(loads))]   
-    # drop some rows to test the js rendering
-    #loadlist = loadlist[3:]
-    json_payload = orjson.dumps(loadlist,
-                                option=orjson.OPT_SERIALIZE_NUMPY)
+    json_payload = json.dumps(loadlist)
     return Response(json_payload, mimetype='application/json')
 
 @app.route('/data')
@@ -189,14 +185,10 @@ def data() -> Any:
     loads = ['load1','load2','load3','load4',
              'load5','load6','load7','load8']
     loadlist = [{'label':load,
-                 'x':latest_va[load]['x'],
-                 'y':latest_va[load]['y']}
+                 'x':latest_va[load]['x'].tolist(),
+                 'y':latest_va[load]['y'].tolist()}
                  for load in latest_va.keys()]   
-                 #for load in random.sample(loads, len(loads))]   
-    # drop some rows to test the js rendering
-    #loadlist = loadlist[3:]
-    json_payload = orjson.dumps(loadlist,
-                                option=orjson.OPT_SERIALIZE_NUMPY)
+    json_payload = json.dumps(loadlist)
     return Response(json_payload, mimetype='application/json')
 
 def main() -> None:
