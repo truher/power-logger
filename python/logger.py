@@ -1,20 +1,25 @@
+"""Logger application"""
 from __future__ import annotations
-import numpy as np
-import pandas as pd
-import serial #type:ignore
+import csv
+import json
+import queue
+import sys
+import threading
+import time
+import traceback
+import warnings
+from datetime import datetime
+from typing import Any
 from serial.threaded import ReaderThread #type:ignore
-import csv, json, queue, sys, threading, time, traceback, warnings
 from flask import Flask, Response
 from waitress import serve #type:ignore
-from typing import Any,Optional
-from datetime import datetime
+import numpy as np
 import lib
 
 RAW_DATA_FILENAME = 'data_raw.csv'
 HOURLY_DATA_FILENAME = 'data_hourly.csv'
 
 app = Flask(__name__)
-# TODO: remove this
 rng = np.random.default_rng() #type:ignore
 
 raw_queue: queue.SimpleQueue[bytes] = queue.SimpleQueue()
@@ -23,7 +28,8 @@ raw_queue: queue.SimpleQueue[bytes] = queue.SimpleQueue()
 OBSERVATION_COUNT = 1000
 interpolator = lib.interpolator(OBSERVATION_COUNT)
 
-randxy = {'x':rng.integers(1023,size=100), 'y': rng.integers(1023,size=100)}
+randxy = {'x': rng.integers(1023, size=100),
+          'y': rng.integers(1023, size=100)}
 
 latest_va = {'load1': randxy,
              'load2': randxy,
@@ -34,68 +40,72 @@ latest_va = {'load1': randxy,
              'load7': randxy,
              'load8': randxy}
 
-def va_updater(va:lib.VA) -> None:
-    loadname = va.load.decode('ascii')
-    #print(f"update {loadname}")
-    if va.load not in latest_va:
-        latest_va[loadname] = {'x':[],'y':[]}
-    latest_va[loadname]['x'] = va.volts
-    latest_va[loadname]['y'] = va.amps
+def va_updater(volts_amps: lib.VA) -> None:
+    """Callback for updating VA"""
+    loadname = volts_amps.load.decode('ascii')
+    if volts_amps.load not in latest_va:
+        latest_va[loadname] = {'x': [], 'y': []}
+    latest_va[loadname]['x'] = volts_amps.volts
+    latest_va[loadname]['y'] = volts_amps.amps
 
 
 TRIM_FREQ = 100 # trim every 30 rows
 TRIM_SIZE = 5000 # size of raw file to retain
 
-# read some rows from the queue, write them to the raw data file
-# and periodically trim it.
 def data_writer() -> None:
+    """Updates the raw file.
+
+    Reads some rows from the queue, writes them to the raw data file
+    and periodically trims it.
+    """
     while True:
         try:
             with open(RAW_DATA_FILENAME, 'ab') as sink:
-                for lines in range(TRIM_FREQ):
+                for _ in range(TRIM_FREQ):
 
-                    #time.sleep(2) # this should fall behind without corruption
                     line = raw_queue.get()
-                    now = datetime.now().isoformat(timespec='microseconds').encode('ascii')
+                    now_s = datetime.now().isoformat(timespec='microseconds')
+                    now_b = now_s.encode('ascii')
 
-                    # TODO fix the format
-                    #old_format_line = f'{now} {line}'
-                    old_format_line = now + b' ' + line
+                    old_format_line = now_b + b' ' + line
 
-                    va = lib.decode_and_interpolate(interpolator, old_format_line)
-                    if va:
-                        va_updater(va)
-                        pwr = lib.average_power_watts(va.volts, va.amps)
-                        real_old_format_line = f"{now.decode('ascii')}\t{va.load.decode('ascii')}\t{pwr}"
+                    volts_amps = lib.decode_and_interpolate(interpolator,
+                                                            old_format_line)
+                    if volts_amps:
+                        va_updater(volts_amps)
+                        pwr = lib.average_power_watts(volts_amps.volts,
+                                                      volts_amps.amps)
+                        load_str = volts_amps.load.decode('ascii')
+                        real_old_format_line = f'{now_s}\t{load_str}\t{pwr}'
                         sink.write(real_old_format_line.encode('ascii'))
                         sink.write(b'\n')
                         sink.flush()
-                        #print(f'queue size {raw_queue.qsize()}')
 
             lib.trim(RAW_DATA_FILENAME, TRIM_SIZE)
-        except:
+        except: # pylint: disable=bare-except
             traceback.print_exc(file=sys.stderr)
             print("top level exception",
-                      sys.exc_info()[0], file=sys.stderr)
+                  sys.exc_info()[0], file=sys.stderr)
 
 def queue_writer_factory() -> lib.QueueLine:
+    """Produce a QueueLine instance."""
     return lib.QueueLine(raw_queue)
 
-# continuously read serial inputs and write to the queue
 def data_reader() -> None:
-    serials:ReaderThread = []
+    """Continuously reads serial inputs, writes to queue."""
+    serials: ReaderThread = []
     while True:
         try:
             # TODO: catch lost connections, and use notify to catch new ttys
             serials = lib.refresh_serials(serials, queue_writer_factory)
             time.sleep(10)
-        except:
+        except: # pylint: disable=bare-except
             traceback.print_exc(file=sys.stderr)
             print("top level exception",
-                      sys.exc_info()[0], file=sys.stderr)
+                  sys.exc_info()[0], file=sys.stderr)
 
-# periodically read the raw file and update the hourly file
 def summarizer() -> None:
+    """Periodically read the raw file and update the hourly file."""
     while True:
         try:
             time.sleep(60)
@@ -110,7 +120,8 @@ def summarizer() -> None:
             if len(hourly) > 0 and len(hourly_file) > 0:
                 hourly = hourly.drop(hourly.index[0]) #type:ignore
             # remove rows corresponding to the new summary
-            hourly_file = hourly_file[~hourly_file.index.isin(hourly.index)] #type:ignore
+            hourly_file = hourly_file[
+                ~hourly_file.index.isin(hourly.index)] #type:ignore
             # append the new summary
             hourly_file = hourly_file.append(hourly)
             hourly_file.sort_index(inplace=True) #type:ignore
@@ -121,40 +132,45 @@ def summarizer() -> None:
                                date_format='%Y-%m-%dT%H',
                                quoting=csv.QUOTE_NONE,
                                float_format='%.6g')
-        except:
+        except: # pylint: disable=bare-except
             traceback.print_exc(file=sys.stderr)
             print("top level exception",
                   sys.exc_info()[0], file=sys.stderr)
 
 @app.route('/')
 def index() -> Any:
+    """index"""
     print('index')
     return app.send_static_file('index.html')
 
 # TODO: serve these using send_from_directory
 @app.route('/logger')
 def logger() -> Any:
+    """logger"""
     print('logger')
     return app.send_static_file('logger.html')
 
 @app.route('/timeseries')
 def timeseries() -> Any:
+    """timeseries"""
     print('timeseries')
     return app.send_static_file('timeseries.html')
 
 @app.route('/raw')
 def raw() -> Any:
+    """raw"""
     print('raw')
     return app.send_static_file('raw.html')
 
 @app.route('/summary')
 def summary() -> Any:
+    """summary"""
     print('summary')
     return app.send_static_file('summary.html')
 
-
 @app.route('/rawdata')
 def rawdata() -> Any:
+    """rawdata"""
     print('rawdata')
     raw_data = lib.read_raw_no_header(RAW_DATA_FILENAME)
     json_payload = json.dumps(raw_data.to_records().tolist()) #type:ignore
@@ -162,6 +178,7 @@ def rawdata() -> Any:
 
 @app.route('/summarydata')
 def summarydata() -> Any:
+    """summarydata"""
     print('summarydata')
     hourly = lib.read_hourly_no_header(HOURLY_DATA_FILENAME)
     json_payload = json.dumps(hourly.to_records().tolist()) #type:ignore
@@ -169,29 +186,28 @@ def summarydata() -> Any:
 
 @app.route('/timeseriesdata')
 def timeseriesdata() -> Any:
-    print('data')
-    loads = ['load1','load2','load3','load4',
-             'load5','load6','load7','load8']
-    loadlist = [{'label':load,
-                 'x':latest_va[load]['x'].tolist(),
-                 'y':latest_va[load]['y'].tolist()}
-                 for load in latest_va.keys()]   
+    """timeseriesdata"""
+    print('timeseriesdata')
+    loadlist = [{'label': load,
+                 'x': samples['x'].tolist(),
+                 'y': samples['y'].tolist()}
+                for load, samples in latest_va.items()]
     json_payload = json.dumps(loadlist)
     return Response(json_payload, mimetype='application/json')
 
 @app.route('/data')
 def data() -> Any:
+    """data"""
     print('data')
-    loads = ['load1','load2','load3','load4',
-             'load5','load6','load7','load8']
-    loadlist = [{'label':load,
-                 'x':latest_va[load]['x'].tolist(),
-                 'y':latest_va[load]['y'].tolist()}
-                 for load in latest_va.keys()]   
+    loadlist = [{'label': load,
+                 'x': samples['x'].tolist(),
+                 'y': samples['y'].tolist()}
+                for load, samples in latest_va.items()]
     json_payload = json.dumps(loadlist)
     return Response(json_payload, mimetype='application/json')
 
 def main() -> None:
+    """main"""
     warnings.filterwarnings('ignore')
     threading.Thread(target=data_reader).start()
     threading.Thread(target=data_writer).start()
