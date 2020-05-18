@@ -247,6 +247,8 @@ def interpolator(samples: int) -> Callable[[List[int]], List[int]]:
     interp_x = np.linspace(0, samples - 1, 2 * samples - 1)
     def f_interp(cumulative: List[int]) -> List[int]:
         """Interpolate the list."""
+        # the slice here is for a performance experiment TODO remove it.
+        # return np.interp(interp_x, interp_xp[0:len(cumulative)], cumulative) #type:ignore
         return np.interp(interp_x, interp_xp, cumulative) #type:ignore
     return f_interp
 
@@ -282,7 +284,6 @@ def goodrow(fields: List[bytes]) -> bool:
 
     Returns:
         False if invalid, true otherwise
-
     """
     if fields is None:
         print('skip empty row')
