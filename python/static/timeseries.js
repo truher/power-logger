@@ -35,8 +35,13 @@ d3.select(container).on('draw', () => {
               .size(4);
             instance = d3.select(this);
             fc.chartCartesian(d3.scaleLinear(), d3.scaleLinear())
-              .xDomain(fc.extentLinear().accessors([(d, i) => i])(instance.data()[0]))
-              .yDomain(fc.extentLinear().accessors([d => d.x * d.y])(instance.data()[0]))
+              .xDomain(
+                fc.extentLinear()
+                  .accessors([(d, i) => i])(instance.data()[0]))
+              .yDomain(
+                fc.extentLinear()
+                  .include([0])
+                  .accessors([d => d.x * d.y])(instance.data()[0]))
               .chartLabel(dd[i].key)
               .xLabel('x axis')
               .yLabel('y axis')

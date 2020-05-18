@@ -64,6 +64,7 @@ def data_writer() -> None:
                 for _ in range(TRIM_FREQ):
 
                     line = raw_queue.get()
+                    # print(line) # TODO for debugging, make configurable
                     now_s = datetime.now().isoformat(timespec='microseconds')
                     now_b = now_s.encode('ascii')
 
@@ -168,6 +169,12 @@ def summary() -> Any:
     print('summary')
     return app.send_static_file('summary.html')
 
+@app.route('/stats')
+def stats() -> Any:
+    """stats"""
+    print('stats')
+    return app.send_static_file('stats.html')
+
 @app.route('/rawdata')
 def rawdata() -> Any:
     """rawdata"""
@@ -182,17 +189,6 @@ def summarydata() -> Any:
     print('summarydata')
     hourly = lib.read_hourly_no_header(HOURLY_DATA_FILENAME)
     json_payload = json.dumps(hourly.to_records().tolist()) #type:ignore
-    return Response(json_payload, mimetype='application/json')
-
-@app.route('/timeseriesdata')
-def timeseriesdata() -> Any:
-    """timeseriesdata"""
-    print('timeseriesdata')
-    loadlist = [{'label': load,
-                 'x': samples['x'].tolist(),
-                 'y': samples['y'].tolist()}
-                for load, samples in latest_va.items()]
-    json_payload = json.dumps(loadlist)
     return Response(json_payload, mimetype='application/json')
 
 @app.route('/data')
