@@ -19,8 +19,6 @@ int row = 0;
 // ct sensor in [1,2,3,4]
 int ct = 1;
 
-char buf[3];  // for each observation byte
-
 // for delta encoding
 int v_first = 0;
 int a_first = 0;
@@ -56,8 +54,8 @@ void setup() {
   TCCR1B = 0;
   TCNT1  = 0;
   // Set compare match register
-  // OCR1A = 800;  // 16MHz/1/10khz/2 samples (50us) = 6 cycles per measurement
-  OCR1A = 1600;  // 16MHz/1/5khz/2 samples (100us) = 12 cycles per measurement
+  // OCR1A = 800;  // 16MHz/1prescale/10khz/2 samples (50us) = 6 cycles per measurement
+  OCR1A = 1600;  // 16MHz/1prescale/5khz/2 samples (100us) = 12 cycles per measurement
   TCCR1B |= (1 << WGM12);  // CTC mode
   TCCR1B |= (1 << CS10);  // prescale = 1
   TIMSK1 |= (1 << OCIE1A);  // enable timer compare interrupt
@@ -114,33 +112,39 @@ ISR(TIMER1_COMPA_vect) {
     TCCR1B = 0;  // stop timer
 }
 
+char big_buf[65];  // usb packets are 64 (32u4 default fifo)
+
+void serialize(uint8_t* samples) {
+  // half the bytes == zero-overhead encoding experiment
+  // TODO: remove this
+  // for (int r = 0; r < 500; r += 20) {
+  // TODO: ten samples is just about the same as 20, do that instead?
+  // TODO: cobs encoding, half the bytes :-)
+  for (int r = 0; r < ROWS; r += 20) {
+    snprintf(big_buf, sizeof(big_buf),
+    "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
+      samples[r+0], samples[r+1], samples[r+2], samples[r+3], samples[r+4],
+      samples[r+5], samples[r+6], samples[r+7], samples[r+8], samples[r+9],
+      samples[r+10], samples[r+11], samples[r+12], samples[r+13], samples[r+14],
+      samples[r+15], samples[r+16], samples[r+17], samples[r+18], samples[r+19]);
+    for (int z = 0; z < 20; ++z) {
+      samples[r+z] = 0;
+    }
+    Serial.write(big_buf, 40);
+  }
+}
+
 void loop() {
   if (row < ROWS) return;  // wait for measurement to be done
 
   digitalWrite(LED_BUILTIN, digitalRead(LED_BUILTIN) ^ 1);
 
-  // TODO(truher): extract a serialize function, test it.
-  Serial.print(err);
-  Serial.print("\t");
-  Serial.print(uidStr);
-  Serial.print("\tct");
-  Serial.print(ct);
-  Serial.print("\t");
-  Serial.print(v_first);
-  Serial.print("\t");
-  for (int r = 0; r < ROWS; ++r) {
-    snprintf(buf, sizeof(buf), "%02X", volts[r]);
-    volts[r] = 0;
-    Serial.write(buf, 2);
-  }
-  Serial.print("\t");
-  Serial.print(a_first);
-  Serial.print("\t");
-  for (int r = 0; r < ROWS; ++r) {
-    snprintf(buf, sizeof(buf), "%02X", amps[r]);
-    amps[r] = 0;
-    Serial.write(buf, 2);
-  }
+  snprintf(big_buf, sizeof(big_buf), "%d\t%s\tct%d\t%d\t",err,uidStr,ct,v_first);
+  Serial.print(big_buf);
+  serialize(volts);
+  snprintf(big_buf, sizeof(big_buf), "\t%d\t", a_first);
+  Serial.print(big_buf);
+  serialize(amps);
   Serial.println();
 
   // restart measurement
