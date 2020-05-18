@@ -24,6 +24,6 @@ d3.json('/data').then(json_data => {
           tr.append('td').text(d=>(nf(d3.deviation(d.value.map(r=>r.x)))));
           tr.append('td').text(d=>(nf(d3.mean(d.value.map(r=>r.y)))));
           tr.append('td').text(d=>(nf(d3.deviation(d.value.map(r=>r.y)))));
-          return enter;
+          return tr;
         });
 });
