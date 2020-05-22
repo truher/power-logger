@@ -9,13 +9,14 @@ import time
 import traceback
 import warnings
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 from serial.threaded import ReaderThread #type:ignore
 from flask import Flask, Response
 from waitress import serve #type:ignore
 import numpy as np
 import lib
 
+SAMPLE_DATA_FILENAME = 'data_sample.csv'
 RAW_DATA_FILENAME = 'data_raw.csv'
 HOURLY_DATA_FILENAME = 'data_hourly.csv'
 
@@ -28,26 +29,22 @@ raw_queue: queue.SimpleQueue[bytes] = queue.SimpleQueue()
 OBSERVATION_COUNT = 1000
 interpolator = lib.interpolator(OBSERVATION_COUNT)
 
-randxy = {'x': rng.integers(1023, size=100),
-          'y': rng.integers(1023, size=100)}
+randx = rng.integers(1023, size=100)
+randy = rng.integers(1023, size=100)
 
-latest_va = {'load1': randxy,
-             'load2': randxy,
-             'load3': randxy,
-             'load4': randxy,
-             'load5': randxy,
-             'load6': randxy,
-             'load7': randxy,
-             'load8': randxy}
+latest_va = {'load1': lib.VA('load1',randx,randy),
+             'load2': lib.VA('load2',randx,randy),
+             'load3': lib.VA('load3',randx,randy),
+             'load4': lib.VA('load4',randx,randy),
+             'load5': lib.VA('load5',randx,randy),
+             'load6': lib.VA('load6',randx,randy),
+             'load7': lib.VA('load7',randx,randy),
+             'load8': lib.VA('load8',randx,randy),}
 
 def va_updater(volts_amps: lib.VA) -> None:
     """Callback for updating VA"""
     loadname = volts_amps.load.decode('ascii')
-    if volts_amps.load not in latest_va:
-        latest_va[loadname] = {'x': [], 'y': []}
-    latest_va[loadname]['x'] = volts_amps.volts
-    latest_va[loadname]['y'] = volts_amps.amps
-
+    latest_va[loadname] = volts_amps
 
 TRIM_FREQ = 100 # trim every 30 rows
 TRIM_SIZE = 5000 # size of raw file to retain
@@ -60,7 +57,8 @@ def data_writer() -> None:
     """
     while True:
         try:
-            with open(RAW_DATA_FILENAME, 'ab') as sink:
+            # TODO: remove sample data, it's just for debugging
+            with open(RAW_DATA_FILENAME, 'ab') as sink, open(SAMPLE_DATA_FILENAME, 'ab') as sample_sink:
                 for _ in range(TRIM_FREQ):
 
                     line = raw_queue.get()
@@ -68,21 +66,42 @@ def data_writer() -> None:
                     now_s = datetime.now().isoformat(timespec='microseconds')
                     now_b = now_s.encode('ascii')
 
+                    # TODO: timestamp at enqueue rather than dequeue, avoid linger time?
                     old_format_line = now_b + b' ' + line
 
-                    volts_amps = lib.decode_and_interpolate(interpolator,
-                                                            old_format_line)
-                    if volts_amps:
-                        va_updater(volts_amps)
-                        pwr = lib.average_power_watts(volts_amps.volts,
-                                                      volts_amps.amps)
-                        load_str = volts_amps.load.decode('ascii')
-                        real_old_format_line = f'{now_s}\t{load_str}\t{pwr}'
-                        sink.write(real_old_format_line.encode('ascii'))
-                        sink.write(b'\n')
-                        sink.flush()
+                    samples: Optional[lib.VA] = lib.decode_and_interpolate(interpolator,
+                                                         old_format_line)
+                    if not samples:
+                        continue
+
+                    sample_v_mean = np.mean(samples.volts)
+                    sample_v_stdev = np.std(samples.volts)
+                    sample_a_mean = np.mean(samples.amps)
+                    sample_a_stdev = np.std(samples.amps)
+ 
+                    sample_line: str = f'{now_s}\t{samples.load}\t{sample_v_mean}\t{sample_v_stdev}\t{sample_a_mean}\t{sample_a_stdev}'
+                    sample_sink.write(sample_line.encode('ascii'))
+                    sample_sink.write(b'\n')
+                    sample_sink.flush()
+
+                    zeroed: lib.VA = lib.zero_samples(samples)
+                    lib.do_stats(zeroed.load, zeroed.volts, zeroed.amps)
+                    volts_amps: lib.VA = lib.scale_samples(zeroed)
+
+                    va_updater(volts_amps)
+                    pwr = lib.average_power_watts(volts_amps.volts,
+                                                  volts_amps.amps)
+                    vrms = lib.rms(volts_amps.volts)
+                    arms = lib.rms(volts_amps.amps)
+                    load_str = volts_amps.load.decode('ascii')
+                    #real_old_format_line = f'{now_s}\t{load_str}\t{pwr}'
+                    real_old_format_line = f'{now_s}\t{load_str}\t{pwr}\t{vrms}\t{arms}'
+                    sink.write(real_old_format_line.encode('ascii'))
+                    sink.write(b'\n')
+                    sink.flush()
 
             lib.trim(RAW_DATA_FILENAME, TRIM_SIZE)
+            lib.trim(SAMPLE_DATA_FILENAME, TRIM_SIZE)
         except: # pylint: disable=bare-except
             traceback.print_exc(file=sys.stderr)
             print("top level exception",
@@ -195,10 +214,10 @@ def summarydata() -> Any:
 def data() -> Any:
     """data"""
     print('data')
-    loadlist = [{'label': load,
-                 'x': samples['x'].tolist(),
-                 'y': samples['y'].tolist()}
-                for load, samples in latest_va.items()]
+    loadlist = [{'load': va.load.decode('ascii'),
+                 'volts': va.volts.tolist(),
+                 'amps': va.amps.tolist()}
+                for va in latest_va.values()]
     json_payload = json.dumps(loadlist)
     return Response(json_payload, mimetype='application/json')
 

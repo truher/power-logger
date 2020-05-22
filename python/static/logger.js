@@ -5,13 +5,13 @@ let allloads = {};
 d3.select(container).on('draw', () => {
   d3.json('/data').then(function(data) {
     data.map(function(row) {
-      zdz = d3.zip(row.x, row.y).map(function(d) {
+      zdz = d3.zip(row.volts, row.amps).map(function(d) {
         return {
-          x: d[0],
-          y: d[1]
+          volts: d[0],
+          amps: d[1]
         }
       });
-      allloads[row.label] = zdz;
+      allloads[row.load] = zdz;
     });
     dd = d3.entries(allloads);
     dd.sort((a, b) => (a.key > b.key) ? 1 : -1)
@@ -26,20 +26,24 @@ d3.select(container).on('draw', () => {
         update => {
           update.each(function(d, i, g) {
             const series = fc.seriesWebglPoint()
-              .crossValue(d => d.x)
-              .mainValue(d => d.y)
+              .crossValue(d => d.volts)
+              .mainValue(d => d.amps)
               .type(d3.symbolCircle)
-              .size(4);
+              .size(1)
+              .decorate(program => {
+                fc.webglFillColor()
+                  .value([0,0,1,1])(program);
+              });
             instance = d3.select(this);
             fc.chartCartesian(d3.scaleLinear(), d3.scaleLinear())
               .xDomain(
                 fc.extentLinear()
-                  .include([0,1024])
-                  .accessors([d => d.x])(instance.data()[0]))
+                  .include([-200,200]) // volts
+                  .accessors([d => d.volts])(instance.data()[0]))
               .yDomain(
                 fc.extentLinear()
-                  .include([0,1024])
-                  .accessors([d => d.y])(instance.data()[0]))
+                  .include([-100,100]) // amps
+                  .accessors([d => d.amps])(instance.data()[0]))
               .chartLabel(dd[i].key)
               .xLabel('x axis')
               .yLabel('y axis')

@@ -8,9 +8,13 @@
   height: 250px;
 }
 
-/* series color */
-.line {
+/* multi series color */
+.multi .line {
   stroke: inherit;
+}
+
+#timeseries path.line {
+  stroke: blue;
 }
 
 /* logger */
@@ -21,10 +25,27 @@
   margin: 0;
 }
 
-/* logger */
-#timeseries>div {
+#allraw > div {
   display: block;
-  height: 250px;
+  height: 150px;
+  width = 100%;
   margin: 0;
 }
 
+#allraw .line {
+  stroke: blue;
+}
+
+/* timeseries */
+#timeseries>div {
+  display: block;
+  height: 150px;
+  margin: 0;
+}
+
+#legend {
+  /*display: block;*/
+  height: 36px;
+  width: 414px;
+  margin: 0;
+}

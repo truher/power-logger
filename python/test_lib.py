@@ -7,11 +7,51 @@ import lib
 
 class TestLib(unittest.TestCase):
     """Contains test cases."""
+    def test_sums(self) -> None:
+        """are the singletons working right?"""
+        s01 = lib.Sums()
+        s02 = lib.Sums()
+        lib.update_stats([1,2,3], s01)
+        self.assertEqual(3, s01.count)
+        self.assertEqual(0, s02.count)
+
+        s1 = lib.allsums['load1']
+        s2 = lib.allsums['load2']
+        lib.update_stats([1,2,3], s1.vsums)
+        self.assertEqual(3, s1.vsums.count)
+        self.assertEqual(0, s2.vsums.count)
+        self.assertAlmostEqual(6, s1.vsums.total)
+        self.assertAlmostEqual(0, s2.vsums.total)
+        self.assertAlmostEqual(14, s1.vsums.sq_total)
+        self.assertAlmostEqual(0, s2.vsums.sq_total)
+        d1 = lib.dump_stats(s1.vsums)
+        d2 = lib.dump_stats(s2.vsums)
+        self.assertEqual(3, d1.count)
+        self.assertEqual(0, d2.count)
+        self.assertAlmostEqual(2, d1.mean)
+        self.assertAlmostEqual(0, d2.mean)
+        self.assertAlmostEqual( 2.160246899, d1.rms)
+        self.assertAlmostEqual(0, d2.rms)
+
+    def test_update_stats(self) -> None:
+        """Tests stats calculations."""
+        x = [1,2,3,4,5]
+        s = lib.Sums()
+        lib.update_stats(x,s)
+        self.assertEqual(5, s.count)
+        self.assertAlmostEqual(15, s.total)
+        self.assertAlmostEqual(55, s.sq_total)
+        ss = lib.dump_stats(s)
+        self.assertEqual(5, ss.count)
+        self.assertAlmostEqual(3, ss.mean)
+        self.assertAlmostEqual(3.31662479, ss.rms)
+
     def test_read_raw_no_header(self) -> None:
         """Tests file reading."""
         raw_data = lib.read_raw_no_header('test_kwh.csv')
         self.assertEqual(24, len(raw_data))
-        self.assertCountEqual(['load', 'measure'], list(raw_data.columns))
+        self.assertCountEqual(['load', 'measure', 'vrms', 'arms'],
+                              list(raw_data.columns))
 
     def test_make_multi_hourly(self) -> None:
         """Tests aggregation."""
@@ -100,13 +140,13 @@ class TestLib(unittest.TestCase):
         """Tests power calculation."""
         # one constant volt * one constant amp = one constant watt
         pwr = lib.average_power_watts([1], [1])
-        self.assertEqual(1, pwr)
+        self.assertAlmostEqual(1, pwr)
 
         # one volt AC * one amp AC = 0.5W
         # (max amplitude, not RMS)
         pwrp = lib.average_power_watts(
-            np.sin(np.linspace(0, 999, 1000)), #type:ignore
-            np.sin(np.linspace(0, 999, 1000))) #type:ignore
+            np.sin(np.linspace(0, np.pi * 4, 2000)), #type:ignore
+            np.sin(np.linspace(0, np.pi * 4, 2000))) #type:ignore
         self.assertAlmostEqual(0.5, pwrp, places=3)
 
     def test_interpolation_and_power(self) -> None:
@@ -121,6 +161,10 @@ class TestLib(unittest.TestCase):
             pwr = lib.average_power_watts(volts_amps.volts, volts_amps.amps)
             self.assertAlmostEqual(267.75, pwr, places=3)
             self.assertEqual(b'load5', volts_amps.load)
+
+    def test_rms(self) -> None:
+        x = np.array([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4])
+        self.assertAlmostEqual(2.9154759, lib.rms(x))
 
 if __name__ == '__main__':
     unittest.main()

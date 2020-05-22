@@ -1,10 +1,12 @@
 """Library for power logging."""
 from __future__ import annotations
 from collections import namedtuple
+from dataclasses import dataclass
 from glob import glob
 from typing import Any, Callable, IO, List, Optional
 import binascii
 import itertools
+import math
 import operator
 import os
 import queue
@@ -33,6 +35,7 @@ class QueueLine(Packetizer): #type:ignore
     def handle_packet(self, packet: bytes) -> None:
         """Enqueues a line."""
         self.buffers_per_line = 0
+        # TODO: prepend timestamp?
         self.raw_queue.put(packet)
     def connection_lost(self, exc: Exception) -> None:
         """Prints a message on disconnect."""
@@ -65,14 +68,15 @@ def read_raw_no_header(filename: str) -> pd.DataFrame:
         DataFrame with index (time), columns (load, ct, measure)
     """
     if os.path.isfile(filename):
-        file_contents = pd.read_csv(filename, delim_whitespace=True,
+        file_contents = pd.read_csv(filename, delim_whitespace=True, #type:ignore
                                     comment='#', index_col=0,
                                     parse_dates=True, header=None,
-                                    names=['time', 'load', 'measure'])
+                                    names=['time', 'load', 'measure', 'vrms', 'arms'])
+        file_contents = file_contents.fillna(0)
         file_contents.sort_index(inplace=True) #type:ignore
         return file_contents
 
-    new_frame = pd.DataFrame(columns=['time', 'load', 'measure'])
+    new_frame = pd.DataFrame(columns=['time', 'load', 'measure', 'vrms', 'arms'])
     new_frame.set_index(keys='time', inplace=True) #type:ignore
     new_frame.sort_index(inplace=True) #type:ignore
     return new_frame
@@ -81,9 +85,12 @@ def read_raw_no_header(filename: str) -> pd.DataFrame:
 def read_hourly_no_header(filename: str) -> pd.DataFrame:
     """Reads an hourly file."""
     if os.path.isfile(filename):
-        return pd.read_csv(filename, delim_whitespace=True, comment='#',
-                           index_col=0, parse_dates=True, header=None,
-                           names=['time', 'load', 'measure'])
+        file_contents = pd.read_csv(filename, delim_whitespace=True, #type:ignore
+                                    comment='#', index_col=0,
+                                    parse_dates=True, header=None,
+                                    names=['time', 'load', 'measure'])
+        file_contents = file_contents.fillna(0)
+        return file_contents
     new_frame = pd.DataFrame(columns=['time', 'load', 'measure'])
     new_frame.set_index(keys='time', inplace=True) #type:ignore
     return new_frame
@@ -160,10 +167,9 @@ def make_hourly(raw_data: pd.DataFrame) -> pd.DataFrame:
     return hourly #type:ignore
 
 # TODO: add power here
+# TODO: use a class instead
 # This NamedTuple exists in order to pass null
 VA = namedtuple('VA', ['load', 'volts', 'amps'])
-
-
 
 def trim(filename: str, count: int) -> None:
     """Read the file and write out the last <count> lines."""
@@ -246,7 +252,10 @@ def interpolator(samples: int) -> Callable[[List[int]], List[int]]:
     # x vals for interpolations, adds in-between vals
     interp_x = np.linspace(0, samples - 1, 2 * samples - 1)
     def f_interp(cumulative: List[int]) -> List[int]:
-        """Interpolate the list."""
+        """Interpolate the list.
+        Returns:
+            An ndarray containing the interpolated samples
+        """
         # the slice here is for a performance experiment TODO remove it.
         # return np.interp(interp_x, interp_xp[0:len(cumulative)], cumulative) #type:ignore
         return np.interp(interp_x, interp_xp, cumulative) #type:ignore
@@ -256,7 +265,10 @@ def interpolator(samples: int) -> Callable[[List[int]], List[int]]:
 def bytes_to_array(interp: Callable[[List[int]], List[int]],
                    all_fields: List[bytes], data_col: int, first_col: int,
                    trim_first: bool) -> Any:
-    """Decode one sample series."""
+    """Decode one sample series.
+    Returns:
+        An ndarray containing the interpolated samples
+    """
     try:
         field = all_fields[data_col]
         decoded = binascii.unhexlify(field)
@@ -317,6 +329,119 @@ def load(fields: List[bytes]) -> bytes:
     """
     return loadnames[fields[2]+fields[3]]
 
+# scale Vrms
+# this is sample rms after zeroing
+scale_rms_volts = {'load1': 168.6,
+                   'load2': 169.3790,
+                   'load3': 169.3046,
+                   'load4': 169.3782,
+                   'load5': 170.4722,
+                   'load6': 170.6309,
+                   'load7': 170.4717,
+                   'load8': 170.6311}
+# actual Vrms, according to Fluke
+actual_rms_volts = 118.2
+
+# scale Vrms
+# this is sample rms after zeroing
+scale_rms_amps = {'load1': 1.5960,
+                  'load2': 1.2981,
+                  'load3': 1.2027,
+                  'load4': 1.2170,
+                  'load5': 1.2242,
+                  'load6': 1.2440,
+                  'load7': 1.2733,
+                  'load8': 1.2182}
+# actual Arms, according to Extech
+actual_rms_amps = 2.03
+
+
+@dataclass
+class Sums:
+    count: int = 0
+    total: float = 0
+    sq_total: float = 0
+
+@dataclass
+class Stats:
+    count: int
+    mean: float
+    rms: float
+
+@dataclass
+class LoadSums:
+    name: str
+    vsums: Sums
+    asums: Sums
+
+allsums = {'load1': LoadSums('load1', Sums(), Sums()),
+           'load2': LoadSums('load2', Sums(), Sums()),
+           'load3': LoadSums('load3', Sums(), Sums()),
+           'load4': LoadSums('load4', Sums(), Sums()),
+           'load5': LoadSums('load5', Sums(), Sums()),
+           'load6': LoadSums('load6', Sums(), Sums()),
+           'load7': LoadSums('load7', Sums(), Sums()),
+           'load8': LoadSums('load8', Sums(), Sums())}
+
+def update_stats(samples: List[int], s: Sums) -> None:
+    """Keeps running stats
+    Args:
+        samples: an ndarray
+    """
+    for sample in samples:
+        s.total += sample
+        s.sq_total += sample * sample
+        s.count += 1
+
+def dump_stats(sums: Sums) -> Stats:
+    """Calculate count, mean, vms"""
+    if sums.count == 0:
+        return Stats(0,0,0)
+    return Stats(sums.count, sums.total/sums.count,
+            math.sqrt(sums.sq_total/sums.count))
+
+def print_stats(lsums: LoadSums) -> None:
+    """print a summary of stats"""
+    vstats: Stats = dump_stats(lsums.vsums)
+    astats: Stats = dump_stats(lsums.asums)
+    print(f'{lsums.name} {vstats.count} {vstats.mean} {vstats.rms} {astats.count} {astats.mean} {astats.rms}')
+
+def do_stats(load_name: bytes, volt_samples: List[int], amp_samples: List[int]) -> None:
+    load_name_s = load_name.decode('ascii')
+    lsums = allsums[load_name_s]
+    update_stats(volt_samples, lsums.vsums)
+    update_stats(amp_samples, lsums.asums)
+    print_stats(lsums)
+
+
+def zero_samples(samples: VA) -> VA:
+#def zero_samples(load_name: bytes, volt_samples: List[int],
+#                        amp_samples: List[int]) -> VA:
+    """Eliminates sample offset.
+
+    Since these are AC coupled measurements, and we look for
+    a long time, the zero is just the mean.
+    Args:
+        load_name: bytes
+        volt_samples: an ndarray
+        amp_samples: an ndarray
+    Returns:
+        A VA named tuple with measurements corresponding to the input samples.
+    """
+    #load_name_s = samples.load.decode('ascii')
+    #vaz = calibrations[load_name_s]
+    volts: List[int] = samples.volts - np.mean(samples.volts)
+    amps: List[int] = samples.amps - np.mean(samples.amps)
+    return VA(samples.load, volts, amps)
+
+def scale_samples(va: VA) -> VA:
+    """Transforms zeroed samples to measures"""
+    load_name_s = va.load.decode('ascii')
+    scale_vrms = scale_rms_volts[load_name_s]
+    scale_arms = scale_rms_amps[load_name_s]
+    volts: List[int] = va.volts * actual_rms_volts / scale_vrms
+    amps: List[int] = va.amps * actual_rms_amps / scale_arms
+    return VA(va.load, volts, amps)
 
 def decode_and_interpolate(interp: Callable[[List[int]], List[int]],
                            line: bytes) -> Optional[VA]:
@@ -342,19 +467,19 @@ def decode_and_interpolate(interp: Callable[[List[int]], List[int]],
     load_name = load(fields)
 
     # volts is the first observation, so trim the first value
-    volts: List[int] = bytes_to_array(interp, fields, 5, 4, True)
-    if volts is None:
+    volt_samples: List[int] = bytes_to_array(interp, fields, 5, 4, True)
+    if volt_samples is None:
         return None # skip uninterpretable rows
 
     # amps is the second observation, so trim the last value
-    amps: List[int] = bytes_to_array(interp, fields, 7, 6, False)
-    if amps is None:
+    amp_samples: List[int] = bytes_to_array(interp, fields, 7, 6, False)
+    if amp_samples is None:
         return None # skip uninterpretable rows
 
-    return VA(load_name, volts, amps)
+    return VA(load_name, volt_samples, amp_samples)
 
 # TODO: add the multiply to VA
-def average_power_watts(volts: List[int], amps: List[int]) -> int:
+def average_power_watts(volts: List[int], amps: List[int]) -> float:
     """Calculates average power in watts.
 
     Args:
@@ -362,3 +487,7 @@ def average_power_watts(volts: List[int], amps: List[int]) -> int:
         amps: series of current samples
     """
     return np.average(np.multiply(volts, amps)) #type:ignore
+
+def rms(samples: List[int]) -> float:
+    """RMS of samples"""
+    return math.sqrt(np.sum(samples*samples)/len(samples)) #type:ignore

@@ -1,55 +1,45 @@
 d3.json('/rawdata').then(json_data => {
-
-  const hourly_records = json_data.map(x=>{
-    return {
-      time:x[0]/1e6,
-      load:x[1],
-      measure:+x[2]
-    };
+  // json_data = [[time,load,kwh,vrms,arms],...]
+  // group by load
+  grps = d3.groups(json_data, d => d[1])
+  // grps = [[load,[[time,load,kwh,vrms,arms],...]],...]
+  grpvar = grps.map(x => {
+    load = x[0];
+    vars = x[1];
+    return [
+      ['kWh ' +load, vars.map(y=>[new Date(y[0]/1e6),+y[2]])],
+      ['Vrms ' + load, vars.map(y=>[new Date(y[0]/1e6),+y[3]])],
+      ['Arms ' + load, vars.map(y=>[new Date(y[0]/1e6),+y[4]])] ]
   });
+  //grpvar = [[[load,[time,measure]],...],...]
+  grpvarflat = grpvar.flat();
+  // grpvarflat = [[load,[time,measure]],...]
+  grpvarflat.sort((a, b) => (a[0] > b[0]) ? 1 : -1)
+  grpvarflatvals = grpvarflat.map(x => x[1])
 
-  const WINDOW_SIZE = 5000;
-  const hourly_window = hourly_records.slice(-1 * WINDOW_SIZE);
-  const load_groups_hourly_records = d3.groups(hourly_window, d=>d.load)
-  load_groups_hourly_records.sort((a,b)=>d3.ascending(a[0],b[0]));
+  instances = d3.select("#allraw")
+    .selectAll("div#instance")
+    .data(grpvarflatvals)
+    .enter()
+      .append('div').attr('id', 'instance');
 
-  const hourly_by_load = load_groups_hourly_records.map(x => x[1]);
+  instances.each(function(d, i, g) {
+    instance = d3.select(this);
 
-  const line = fc
-    .seriesSvgLine()
-    .crossValue(d => new Date(d.time))
-    .mainValue(d => d.measure);
+    const lline = fc.seriesSvgLine()
+      .crossValue(d => d[0])
+      .mainValue(d => d[1]);
 
-  const color = d3.scaleOrdinal(d3.range(hourly_by_load.length),
-    d3.schemeCategory10);
+    const cchart = fc.chartCartesian(d3.scaleTime(), d3.scaleLinear())
+      .xDomain(fc.extentTime().accessors([d => d[0]])(instance.data()[0]))
+      .xTicks(10)
+      .yDomain(fc.extentLinear().accessors([d => d[1]])(instance.data()[0]))
+      .yTicks(4)
+      .yOrient('left')
+      .chartLabel(grpvarflat[i][0])
+      .svgPlotArea(lline);
 
-  const series = fc.seriesSvgRepeat()
-    .orient('horizontal')
-    .series(line)
-    .decorate(sel => { sel.attr('stroke', (_, i) => color(i)); });
+    instance.call(cchart);
 
-  const legend = d3.legendColor()
-    .shapeWidth(30)
-    .orient('vertical')
-    .scale(color)
-    .labels(load_groups_hourly_records.map(x => x[0]));
-
-  const hourly_chart = fc.chartCartesian(d3.scaleTime(), d3.scaleLinear())
-    .chartLabel('kWh raw observations (' + WINDOW_SIZE + ')')
-    .xDomain(
-      fc.extentTime()
-        .accessors([d => new Date(d.time)])(hourly_by_load.flat()))
-    .yDomain(
-      fc.extentLinear()
-        .include([0])
-        .accessors([d => d.measure])(hourly_by_load.flat()))
-    .yLabel('kilowatt-hours')
-    .yOrient('left')
-    .svgPlotArea(series);
-
-  d3.select('div#raw')
-    .datum(hourly_by_load)
-    .call(hourly_chart)
-    .select('d3fc-group d3fc-svg.plot-area svg')
-    .call(legend);
+  });
 });
