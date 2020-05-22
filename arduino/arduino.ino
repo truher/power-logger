@@ -8,6 +8,7 @@ Column column = VOLTS;
 
 char uidStr[19] = {0};
 const unsigned int ROWS = 1000;
+const unsigned int LED_EMON = 9;
 
 // observations from analogRead()
 uint8_t volts[ROWS];
@@ -36,6 +37,7 @@ void setup() {
     boot_signature_byte_get(21), boot_signature_byte_get(22),
     boot_signature_byte_get(23));
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(LED_EMON, OUTPUT);
 
   // set up Serial
   Serial.begin(115200);
@@ -136,6 +138,7 @@ void serialize(uint8_t* samples) {
 
 void loop() {
   if (row < ROWS) return;  // wait for measurement to be done
+  digitalWrite(LED_EMON, LOW);
 
   digitalWrite(LED_BUILTIN, digitalRead(LED_BUILTIN) ^ 1);
 
@@ -152,6 +155,7 @@ void loop() {
   ++ct;
   if (ct > 4) ct = 1;
   row = 0;
+  digitalWrite(LED_EMON, HIGH);
   TCCR1B |= (1 << WGM12);
   TCCR1B |= (1 << CS10);
 }
