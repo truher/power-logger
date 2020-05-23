@@ -70,8 +70,8 @@ class TestLib(unittest.TestCase):
 
     def test_bytes_to_array(self) -> None:
         """Tests decoding."""
-        def interp(samples: List[int])->List[int]:
-            return samples
+        def interp(samples: List[int])->List[float]:
+            return samples #type:ignore
         # no data
         self.assertIsNone(lib.bytes_to_array(interp, [], 0, 0, True))
         # data col out of range
@@ -83,8 +83,9 @@ class TestLib(unittest.TestCase):
         # note the first observation needs to be zero TODO fix that
         # note the interpolator is a passthrough, and we trim the first
         data = [b'10', b'8081818181']
-        self.assertCountEqual(
-            [11, 12, 13, 14], lib.bytes_to_array(interp, data, 1, 0, True))
+        result = lib.bytes_to_array(interp, data, 1, 0, True)
+        if result:
+            self.assertCountEqual( [11, 12, 13, 14], result)
 
     def test_interpolator(self) -> None:
         """Tests interpolation."""
@@ -164,7 +165,7 @@ class TestLib(unittest.TestCase):
 
     def test_rms(self) -> None:
         x = np.array([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4])
-        self.assertAlmostEqual(2.9154759, lib.rms(x))
+        self.assertAlmostEqual(2.9154759, lib.rms(x)) #type:ignore
 
 if __name__ == '__main__':
     unittest.main()

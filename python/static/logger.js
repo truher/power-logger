@@ -38,11 +38,17 @@ d3.select(container).on('draw', () => {
             fc.chartCartesian(d3.scaleLinear(), d3.scaleLinear())
               .xDomain(
                 fc.extentLinear()
-                  .include([-200,200]) // volts
+                  .pad([0.05,0.05])
+                  .padUnit('percent')
+                  .symmetricalAbout(0)
+                  .include([-1,1]) // volts
                   .accessors([d => d.volts])(instance.data()[0]))
               .yDomain(
                 fc.extentLinear()
-                  .include([-100,100]) // amps
+                  .pad([0.05,0.05])
+                  .padUnit('percent')
+                  .symmetricalAbout(0)
+                  .include([-1,1]) // amps
                   .accessors([d => d.amps])(instance.data()[0]))
               .chartLabel(dd[i].key)
               .xLabel('x axis')

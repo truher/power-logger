@@ -43,11 +43,10 @@ latest_va = {'load1': lib.VA('load1',randx,randy),
 
 def va_updater(volts_amps: lib.VA) -> None:
     """Callback for updating VA"""
-    loadname = volts_amps.load.decode('ascii')
-    latest_va[loadname] = volts_amps
+    latest_va[volts_amps.load] = volts_amps
 
-TRIM_FREQ = 100 # trim every 30 rows
-TRIM_SIZE = 5000 # size of raw file to retain
+TRIM_FREQ = 200 # trim every N rows
+TRIM_SIZE = 10000 # size of raw file to retain
 
 def data_writer() -> None:
     """Updates the raw file.
@@ -63,21 +62,21 @@ def data_writer() -> None:
 
                     line = raw_queue.get()
                     # print(line) # TODO for debugging, make configurable
-                    now_s = datetime.now().isoformat(timespec='microseconds')
-                    now_b = now_s.encode('ascii')
+                    now_s: str = datetime.now().isoformat(timespec='microseconds')
+                    now_b: bytes = now_s.encode('ascii')
 
                     # TODO: timestamp at enqueue rather than dequeue, avoid linger time?
-                    old_format_line = now_b + b' ' + line
+                    old_format_line: bytes = now_b + b' ' + line
 
                     samples: Optional[lib.VA] = lib.decode_and_interpolate(interpolator,
                                                          old_format_line)
                     if not samples:
                         continue
 
-                    sample_v_mean = np.mean(samples.volts)
-                    sample_v_stdev = np.std(samples.volts)
-                    sample_a_mean = np.mean(samples.amps)
-                    sample_a_stdev = np.std(samples.amps)
+                    sample_v_mean: float = np.mean(samples.volts) #type:ignore
+                    sample_v_stdev: float = np.std(samples.volts) #type:ignore
+                    sample_a_mean: float = np.mean(samples.amps) #type:ignore
+                    sample_a_stdev: float = np.std(samples.amps) #type:ignore
  
                     sample_line: str = f'{now_s}\t{samples.load}\t{sample_v_mean}\t{sample_v_stdev}\t{sample_a_mean}\t{sample_a_stdev}'
                     sample_sink.write(sample_line.encode('ascii'))
@@ -89,13 +88,12 @@ def data_writer() -> None:
                     volts_amps: lib.VA = lib.scale_samples(zeroed)
 
                     va_updater(volts_amps)
-                    pwr = lib.average_power_watts(volts_amps.volts,
+                    pwr: float = lib.average_power_watts(volts_amps.volts,
                                                   volts_amps.amps)
-                    vrms = lib.rms(volts_amps.volts)
-                    arms = lib.rms(volts_amps.amps)
-                    load_str = volts_amps.load.decode('ascii')
-                    #real_old_format_line = f'{now_s}\t{load_str}\t{pwr}'
-                    real_old_format_line = f'{now_s}\t{load_str}\t{pwr}\t{vrms}\t{arms}'
+                    vrms: float = lib.rms(volts_amps.volts)
+                    arms: float = lib.rms(volts_amps.amps)
+                    load_s: str = volts_amps.load
+                    real_old_format_line = f'{now_s}\t{load_s}\t{pwr}\t{vrms}\t{arms}'
                     sink.write(real_old_format_line.encode('ascii'))
                     sink.write(b'\n')
                     sink.flush()
@@ -214,9 +212,9 @@ def summarydata() -> Any:
 def data() -> Any:
     """data"""
     print('data')
-    loadlist = [{'load': va.load.decode('ascii'),
-                 'volts': va.volts.tolist(),
-                 'amps': va.amps.tolist()}
+    loadlist = [{'load': va.load,
+                 'volts': va.volts.tolist(), #type:ignore
+                 'amps': va.amps.tolist()} #type:ignore
                 for va in latest_va.values()]
     json_payload = json.dumps(loadlist)
     return Response(json_payload, mimetype='application/json')
