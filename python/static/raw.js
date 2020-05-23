@@ -1,6 +1,7 @@
 const container = document.querySelector('#allraw')
 d3.select(container).on('draw', () => {
   d3.json('/rawdata').then(json_data => {
+    json_data = json_data.slice(-10000)
     // json_data = [[time,load,kwh,vrms,arms],...]
     grps = d3.groups(json_data, d => d[1])
     // grps = [[load,[[time,load,kwh,vrms,arms],...]],...]
