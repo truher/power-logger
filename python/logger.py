@@ -8,6 +8,7 @@ import threading
 import time
 import traceback
 import warnings
+from config import loadnames
 from datetime import datetime
 from typing import Any, Optional
 from serial.threaded import ReaderThread #type:ignore
@@ -68,8 +69,8 @@ def data_writer() -> None:
                     # TODO: timestamp at enqueue rather than dequeue, avoid linger time?
                     old_format_line: bytes = now_b + b' ' + line
 
-                    samples: Optional[lib.VA] = lib.decode_and_interpolate(interpolator,
-                                                         old_format_line)
+                    samples: Optional[lib.VA] = lib.decode_and_interpolate(
+                        loadnames, interpolator, old_format_line)
                     if not samples:
                         continue
 

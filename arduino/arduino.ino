@@ -17,8 +17,10 @@ uint8_t amps[ROWS];
 // which observation we're making, also the read/print semaphore
 int row = 0;
 
-// ct sensor in [1,2,3,4]
-int ct = 1;
+// ct sensor in [1..4] (leonardo) or [2..15] (mega)
+const int MIN_CT = 2;
+const int MAX_CT = 15;
+int ct = MIN_CT;
 
 // for delta encoding
 int v_first = 0;
@@ -74,6 +76,7 @@ ISR(TIMER1_COMPA_vect) {
   // TODO(truher): remove the duplication here
   switch (column) {
     case VOLTS:
+      // TODO: fix this for the mega case, 120/240 etc
       v = analogRead(0);
       if (row == 0) {
         v_first = v;
@@ -153,7 +156,7 @@ void loop() {
   // restart measurement
   err = false;
   ++ct;
-  if (ct > 4) ct = 1;
+  if (ct > MAX_CT) ct = MIN_CT;
   row = 0;
   digitalWrite(LED_EMON, HIGH);
   TCCR1B |= (1 << WGM12);

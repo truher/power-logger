@@ -124,6 +124,7 @@ class TestLib(unittest.TestCase):
         # amps:       20.0 20.5 21.0 21.5 22.0 22.5 23.0 23.5
         #
         volts_amps = lib.decode_and_interpolate(
+            {b'5737333034370A220Dct1': 'foo'},
             interp,
             b'x 0 5737333034370A220D ct1 10 8081818181 20 8081818181')
         self.assertIsNotNone(volts_amps)
@@ -155,17 +156,22 @@ class TestLib(unittest.TestCase):
         interp = lib.interpolator(5)
         # same as above
         volts_amps = lib.decode_and_interpolate(
+            {b'5737333034370A220Dct1': 'foo'},
             interp,
             b'x 0 5737333034370A220D ct1 10 8081818181 20 8081818181')
         self.assertIsNotNone(volts_amps)
         if volts_amps: # this is for mypy
             pwr = lib.average_power_watts(volts_amps.volts, volts_amps.amps)
             self.assertAlmostEqual(267.75, pwr, places=3)
-            self.assertEqual('load5', volts_amps.load)
+            self.assertEqual('foo', volts_amps.load)
 
     def test_rms(self) -> None:
         x = np.array([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4])
         self.assertAlmostEqual(2.9154759, lib.rms(x)) #type:ignore
+
+    def test_load(self) -> None:
+        x = lib.load({b'cd': 'e'}, [b"a", b"b", b"c", b"d"])
+        self.assertEqual("e", x)
 
 if __name__ == '__main__':
     unittest.main()

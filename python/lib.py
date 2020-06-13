@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import namedtuple
 from dataclasses import dataclass
 from glob import glob
-from typing import Any, Callable, IO, List, NamedTuple, Optional
+from typing import Any, Callable, Dict, IO, List, NamedTuple, Optional
 import binascii
 import itertools
 import math
@@ -314,16 +314,18 @@ def goodrow(fields: List[bytes]) -> bool:
         return False
     return True
 
-loadnames = {b"5737333034370D0E14ct1": 'load1',
-             b"5737333034370D0E14ct2": 'load2',
-             b"5737333034370D0E14ct3": 'load3',
-             b"5737333034370D0E14ct4": 'load4',
-             b"5737333034370A220Dct1": 'load5',
-             b"5737333034370A220Dct2": 'load6',
-             b"5737333034370A220Dct3": 'load7',
-             b"5737333034370A220Dct4": 'load8'}
+from config import loadnames
+## FOR A PAIR OF LEONARDOS WITH EMONTX SHIELDS
+#loadnames = {b"5737333034370D0E14ct1": 'load1',
+#             b"5737333034370D0E14ct2": 'load2',
+#             b"5737333034370D0E14ct3": 'load3',
+#             b"5737333034370D0E14ct4": 'load4',
+#             b"5737333034370A220Dct1": 'load5',
+#             b"5737333034370A220Dct2": 'load6',
+#             b"5737333034370A220Dct3": 'load7',
+#             b"5737333034370A220Dct4": 'load8'}
 
-def load(fields: List[bytes]) -> str:
+def load(loadnames: Dict[bytes, str], fields: List[bytes]) -> str:
     """Maps arduino fields to load names.
 
     Args:
@@ -339,17 +341,23 @@ def load(fields: List[bytes]) -> str:
 # sample period of about a minute
 
 # Vrms, according to Fluke
-actual_rms_volts = 120.3
+from config import actual_rms_volts
+#actual_rms_volts = 120.3
 # Arms, according to Extech
-actual_rms_amps = 2.05
+from config import actual_rms_amps
+#actual_rms_amps = 2.05
 
 # mean Vrms from data_sample.csv
-sample_rms_volts = [171.645, 171.720, 171.648, 171.727, 172.793, 172.964, 172.780, 172.953]
+#from config import sample_rms_volts
+#sample_rms_volts = [171.645, 171.720, 171.648, 171.727, 172.793, 172.964, 172.780, 172.953]
 # mean Arms from data_sample.csv
-sample_rms_amps = [6.985, 6.799, 6.763, 6.817, 6.786, 6.898, 6.794, 6.785]
+#from config import sample_rms_amps
+#sample_rms_amps = [6.985, 6.799, 6.763, 6.817, 6.786, 6.898, 6.794, 6.785]
 
-scale_rms_volts = dict(zip(loadnames.values(), sample_rms_volts))
-scale_rms_amps = dict(zip(loadnames.values(), sample_rms_amps))
+from config import scale_rms_volts
+#scale_rms_volts = dict(zip(loadnames.values(), sample_rms_volts))
+from config import scale_rms_amps
+#scale_rms_amps = dict(zip(loadnames.values(), sample_rms_amps))
 
 
 @dataclass
@@ -370,6 +378,7 @@ class LoadSums:
     vsums: Sums
     asums: Sums
 
+# TODO: derive this from loadnames
 allsums = {'load1': LoadSums('load1', Sums(), Sums()),
            'load2': LoadSums('load2', Sums(), Sums()),
            'load3': LoadSums('load3', Sums(), Sums()),
@@ -377,7 +386,13 @@ allsums = {'load1': LoadSums('load1', Sums(), Sums()),
            'load5': LoadSums('load5', Sums(), Sums()),
            'load6': LoadSums('load6', Sums(), Sums()),
            'load7': LoadSums('load7', Sums(), Sums()),
-           'load8': LoadSums('load8', Sums(), Sums())}
+           'load8': LoadSums('load8', Sums(), Sums()),
+           'load9': LoadSums('load9', Sums(), Sums()),
+           'load10': LoadSums('load10', Sums(), Sums()),
+           'load11': LoadSums('load11', Sums(), Sums()),
+           'load12': LoadSums('load12', Sums(), Sums()),
+           'load13': LoadSums('load13', Sums(), Sums()),
+           'load14': LoadSums('load14', Sums(), Sums())}
 
 def update_stats(samples: List[float], s: Sums) -> None:
     """Keeps running stats
@@ -429,7 +444,8 @@ def scale_samples(va: VA) -> VA:
     amps: List[float] = va.amps * actual_rms_amps / scale_arms #type:ignore
     return VA(va.load, volts, amps)
 
-def decode_and_interpolate(interp: Callable[[List[int]], List[float]],
+def decode_and_interpolate(loadnames: Dict[bytes, str],
+                           interp: Callable[[List[int]], List[float]],
                            line: bytes) -> Optional[VA]:
     """Decodes and interpolates sample series.
 
@@ -450,7 +466,7 @@ def decode_and_interpolate(interp: Callable[[List[int]], List[float]],
     if not goodrow(fields):
         return None # skip obviously bad rows
 
-    load_name_s: str = load(fields)
+    load_name_s: str = load(loadnames, fields)
 
     # volts is the first observation, so trim the first value
     volt_samples: Optional[List[float]] = bytes_to_array(interp, fields, 5, 4, True)
