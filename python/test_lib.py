@@ -35,7 +35,7 @@ class TestLib(unittest.TestCase):
 
     def test_update_stats(self) -> None:
         """Tests stats calculations."""
-        x = [1,2,3,4,5]
+        x: List[float] = [1,2,3,4,5]
         s = lib.Sums()
         lib.update_stats(x,s)
         self.assertEqual(5, s.count)
@@ -161,7 +161,7 @@ class TestLib(unittest.TestCase):
         if volts_amps: # this is for mypy
             pwr = lib.average_power_watts(volts_amps.volts, volts_amps.amps)
             self.assertAlmostEqual(267.75, pwr, places=3)
-            self.assertEqual(b'load5', volts_amps.load)
+            self.assertEqual('load5', volts_amps.load)
 
     def test_rms(self) -> None:
         x = np.array([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4])
