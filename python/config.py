@@ -22,13 +22,7 @@ loadnames = {b"6E756E6B776F000C02ct2": 'load1',
              b"6E756E6B776F000C02ct12": 'load11',
              b"6E756E6B776F000C02ct13": 'load12',
              b"6E756E6B776F000C02ct14": 'load13',
-             #b"6E756E6B776F000C02ct15": 'load14'}
-             b"6E756E6B776F000C02ct15": 'load14',
-             b"5737333034370A220Dct1": 'load5',
-             b"5737333034370A220Dct2": 'load6',
-             b"5737333034370A220Dct3": 'load7',
-             b"5737333034370A220Dct4": 'load8'}
-
+             b"6E756E6B776F000C02ct15": 'load14'}
 
 # see
 # https://docs.google.com/spreadsheets/d/1L5l22Gl8_NVvAKYv-z71Cd4lBbWYdaJ1Pb2_rq0OKFM/edit#
