@@ -1,5 +1,4 @@
 //
-
 // see EEOL_2014APR24_AMP_CTRL_AN_01.pdf
 // see ADC_Module.cpp
 // see DMAChannel.cpp
@@ -7,14 +6,13 @@
 
 const uint8_t pinLED = 13; // built-in LED
 uint8_t LED_ON = true;
-uint32_t iCounter = 0;
-uint32_t jCounter = 0;
+//uint32_t iCounter = 0;
 
-volatile unsigned short result0RA;
-volatile unsigned short result1RA;
+//volatile unsigned short result0RA;
+//volatile unsigned short result1RA;
 
 //const uint32_t buffer_size = 1600;
-const uint32_t buffer_size = 16;  // for testing
+const uint32_t buffer_size = 1000;  // for testing
 DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer0[buffer_size];
 DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer1[buffer_size];
 
@@ -28,69 +26,104 @@ void toggleLED() {
     LED_ON = !LED_ON;
 }
 
-void ftm0_isr(void) {
-  noInterrupts();
-  FTM0_SC &= ~FTM_SC_TOF; // clear the interrupt overflow flag
-  iCounter ++; // time base counter
-  if (iCounter >= 10000) { // 1 second
-    iCounter = 0;
+//void ftm0_isr(void) {
+//  noInterrupts();
+//  FTM0_SC &= ~FTM_SC_TOF; // clear the interrupt overflow flag
+//  iCounter ++; // time base counter
+//  if (iCounter >= 10) { // 1 second
+//    iCounter = 0;
+//
+//    Serial.print(result0RA);
+//    Serial.print(", ");
+//    Serial.print(result1RA);
+//    Serial.println();
+//
+//  //toggleLED();
+//  }
+//   interrupts();
+//}
 
-    Serial.print(result0RA);
+//void adc0_isr() {
+//  noInterrupts();
+//  if ( ADC0_SC1A & ADC_SC1_COCO )
+//    result0RA = (unsigned short) ADC0_RA;
+//  interrupts();
+//}
+//
+//void adc1_isr() {
+//    noInterrupts();
+//  if ( ADC1_SC1A & ADC_SC1_COCO )
+//    result1RA = (unsigned short) ADC1_RA;
+//   interrupts();
+//}
+
+void restartTimer() {
+  //Serial.println("restart timer");
+  DMA_SERQ = 0;  // enable DMA channel 0
+  DMA_SERQ = 1;  // enable DMA channel 1
+  FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(1);  // turn the timer back on
+}
+
+// if neither channel is done, we shouldn't be here.
+// if one channel is done, let the other finish, it won't hurt anything.
+// if both channels are done, then set up a new run.
+void maybeRestart() {
+  //Serial.println("are both channels stopped?");
+  //Serial.println(DMA_ERQ);
+  if (DMA_ERQ & DMA_ERQ_ERQ0) return;  // channel 0 still enabled
+  if (DMA_ERQ & DMA_ERQ_ERQ1) return;  // channel 1 still enabled
+  
+  //Serial.println("yes, both channels are stopped"); // but one of the interrupts might be waiting
+  
+  //Serial.println("turn off the timer");
+  FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(0);  // turn off the timer
+
+  //Serial.println("results (buffer0, buffer1):");
+
+  for (int i = 0; i < buffer_size; ++i) {
+    Serial.print(i);
     Serial.print(", ");
-    Serial.print(result1RA);
+    Serial.print(buffer0[i]);
+    Serial.print(", ");  
+    Serial.print(buffer1[i]);
     Serial.println();
-
-  //toggleLED();
   }
-   interrupts();
-}
-
-void adc0_isr() {
-  noInterrupts();
-  if ( ADC0_SC1A & ADC_SC1_COCO )
-    result0RA = (unsigned short) ADC0_RA;
-  interrupts();
-}
-
-void adc1_isr() {
-    noInterrupts();
-  if ( ADC1_SC1A & ADC_SC1_COCO )
-    result1RA = (unsigned short) ADC1_RA;
-   interrupts();
+  
+  //Serial.println("TODO: reconfigure ADC channels etc.");
+  // more here ...
+  delay(1000);
+  //Serial.println("delay done."); 
+  restartTimer();  // reenable DMA, restart timer
 }
 
 void dma_ch0_isr() {
-  noInterrupts();
+  //Serial.println();
+  //Serial.print(micros());
+  //Serial.println(" dma ch0 isr");
+  //noInterrupts();
   DMA_CINT = DMA_CINT_CINT(0);  // clear the interrupt to avoid infinite loop
-  FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(0);  // turn off the timer
-  Serial.println("dma_ch0_isr ");
-  for (int i = 0; i < buffer_size; ++i) {
-    Serial.print(buffer0[i]);
-    Serial.print(" ");  
-  }
-  Serial.println();
-   interrupts();
+  maybeRestart();
+  //interrupts();
 }
 
 void dma_ch1_isr() {
-  noInterrupts();
+  //Serial.println();
+  //Serial.print(micros());
+  //Serial.println(" dma ch1 isr");
+  //noInterrupts();
   DMA_CINT = DMA_CINT_CINT(1);
-  FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(0);
-  Serial.println("dma_ch1_isr ");
-  for (int i = 0; i < buffer_size; ++i) {
-    Serial.print(buffer1[i]);
-    Serial.print(" ");  
-  }
-  Serial.println();
-   interrupts();
+  maybeRestart();
+  //interrupts();
 }
 
 void setup() {
   Serial.begin(0);
   while (!Serial);  // this makes it hang until serial monitor is opened.  :-(
+  Serial.println("setup start");
   pinMode(pinLED, OUTPUT);
 
   // FTM SETUP
+  Serial.println("FTM setup");
   
   FTM0_POL = 0;
   FTM0_OUTMASK = 0xFF; // mask all
@@ -98,8 +131,11 @@ void setup() {
   FTM0_CNT = 0x00;  // zero the counter, or maybe this does nothing
   FTM0_CNTIN = 0; // counter initial value
   FTM0_C0SC = FTM_CSC_ELSB | FTM_CSC_MSB; // output compare, high-true
-  FTM0_MOD = 32;  // modulo, for the counter, output high on overflow
-  FTM0_C0V = 16;  // match value, output low on match
+  // FTM0_MOD = 32;  // modulo, for the counter, output high on overflow
+  FTM0_MOD = 16000;
+  //FTM0_C0V = 16;  // match value, output low on match
+  FTM0_C0V = 8000;  // match value, output low on match
+
 
   // bga pin b11 (row b, column 11) is port c1 ("PTC1"), which is teensy pin 22 or a8
   // CORE_PIN22_CONFIG ... do i need that alias?
@@ -107,8 +143,8 @@ void setup() {
              | PORT_PCR_DSE    // high drive strength
              | PORT_PCR_SRE;   // slow slew rate (?)
 
-  NVIC_SET_PRIORITY(IRQ_FTM0, 64);  // 0?  64?  who knows?
-  NVIC_ENABLE_IRQ(IRQ_FTM0);
+//  NVIC_SET_PRIORITY(IRQ_FTM0, 64);  // 0?  64?  who knows?
+//  NVIC_ENABLE_IRQ(IRQ_FTM0);
   
   FTM0_SC = FTM_SC_CLKS(1)   // set status: system clock
             | FTM_SC_PS(0)   // no prescaling
@@ -120,6 +156,7 @@ void setup() {
   FTM0_OUTMASK = 0xFE; // enable only FTM0_CH0
 
   // ADC SETUP
+  Serial.println("ADC setup");
 
   SIM_SOPT7 = SIM_SOPT7_ADC0ALTTRGEN  // enable alternate trigger
             | SIM_SOPT7_ADC1ALTTRGEN
@@ -150,12 +187,14 @@ void setup() {
 
   // TODO: these interrupts will interrupt each other needlessly?
   
-  NVIC_SET_PRIORITY(IRQ_ADC0, 64);  // 0?  64?  who knows?
-  NVIC_SET_PRIORITY(IRQ_ADC1, 65);  // 0?  64?  who knows?
-  NVIC_ENABLE_IRQ(IRQ_ADC0);
-  NVIC_ENABLE_IRQ(IRQ_ADC1);
+  //NVIC_SET_PRIORITY(IRQ_ADC0, 64);  // 0?  64?  who knows?
+  //NVIC_SET_PRIORITY(IRQ_ADC1, 65);  // 0?  64?  who knows?
+  //NVIC_ENABLE_IRQ(IRQ_ADC0);
+  //NVIC_ENABLE_IRQ(IRQ_ADC1);
 
   // DMA SETUP
+  Serial.println("DMA setup");
+
 
   SIM_SCGC7 |= SIM_SCGC7_DMA;     // enable DMA clock
   SIM_SCGC6 |= SIM_SCGC6_DMAMUX;  // enable DMA MUX clock
@@ -182,8 +221,8 @@ void setup() {
 
   // DMA NBYTES
   
-  DMA_TCD0_NBYTES_MLOFFYES = DMA_TCD_NBYTES_MLOFFNO_NBYTES(2);  // transfer 16 bits
-  DMA_TCD1_NBYTES_MLOFFYES = DMA_TCD_NBYTES_MLOFFNO_NBYTES(2);
+  DMA_TCD0_NBYTES_MLNO = 2;  // transfer 16 bits
+  DMA_TCD1_NBYTES_MLNO = 2;
 
   // DMA DEST SETUP
   
@@ -217,31 +256,19 @@ void setup() {
 
   // RESULT INTERRUPT
 
-  NVIC_SET_PRIORITY(IRQ_DMA_CH0, 64);
-  NVIC_SET_PRIORITY(IRQ_DMA_CH1, 64);
   NVIC_ENABLE_IRQ(IRQ_DMA_CH0);
   NVIC_ENABLE_IRQ(IRQ_DMA_CH1);
 
-  
+  Serial.println("setup done");
 }
-
-
-
-
-
-
-
-
-
 
 void loop() {
   if (Serial.available()) {
     while (Serial.read() != -1) {
       // do nothing
     }
+    Serial.println("loop read");
     toggleLED();
-    DMA_SERQ = 0;  // enable DMA channel 0
-    DMA_SERQ = 1;  // enable DMA channel 1
-    FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(1);  // turn the timer back on
+    restartTimer();
   }
 }
