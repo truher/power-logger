@@ -330,7 +330,8 @@ allsums = {'load1': LoadSums('load1', Sums(), Sums()),
            'load13': LoadSums('load13', Sums(), Sums()),
            'load14': LoadSums('load14', Sums(), Sums())}
 
-def update_stats(samples: List[float], sums: Sums) -> None:
+def update_stats(samples: np.ndarray[np.float64], # pylint: disable=E1136  # pylint/issues/3139
+                 sums: Sums) -> None:
     """Keeps running stats
     Args:
         samples: an ndarray
@@ -355,8 +356,8 @@ def print_stats(lsums: LoadSums) -> None:
           f' {astats.count} {astats.mean} {astats.rms}')
 
 def do_stats(load_name_s: str,
-             volt_samples: List[float],
-             amp_samples: List[float]) -> None:
+             volt_samples: np.ndarray[np.float64], # pylint: disable=E1136  # pylint/issues/3139
+             amp_samples: np.ndarray[np.float64]) -> None: # pylint: disable=E1136  # pylint/issues/3139
     """maintain stats"""
     lsums: LoadSums = allsums[load_name_s]
     update_stats(volt_samples, lsums.vsums)
@@ -423,7 +424,8 @@ def decode_and_interpolate(loadnames: Dict[bytes, str],
     return VA(load_name_s, volt_samples, amp_samples)
 
 # TODO: add the multiply to VA
-def average_power_watts(volts: np.ndarray[np.float64], amps: np.ndarray[np.float64]) -> float:
+def average_power_watts(volts: np.ndarray[np.float64], # pylint: disable=E1136  # pylint/issues/3139
+                        amps: np.ndarray[np.float64]) -> float: # pylint: disable=E1136  # pylint/issues/3139
     """Calculates average power in watts.
 
     Args:
@@ -432,6 +434,6 @@ def average_power_watts(volts: np.ndarray[np.float64], amps: np.ndarray[np.float
     """
     return np.average(np.multiply(volts, amps)) #type:ignore
 
-def rms(samples: List[float]) -> float:
+def rms(samples: np.ndarray[np.float64]) -> float: # pylint: disable=E1136  # pylint/issues/3139
     """RMS of samples"""
-    return math.sqrt(np.sum(samples*samples)/len(samples)) #type:ignore
+    return math.sqrt(np.sum(samples*samples)/len(samples))

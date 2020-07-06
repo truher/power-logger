@@ -8,13 +8,13 @@ import threading
 import time
 import traceback
 import warnings
-from config import loadnames
 from datetime import datetime
 from typing import Any, Optional
 from serial.threaded import ReaderThread #type:ignore
 from flask import Flask, Response
 from waitress import serve #type:ignore
 import numpy as np
+from config import loadnames
 import lib
 
 SAMPLE_DATA_FILENAME = 'data_sample.csv'
@@ -32,14 +32,14 @@ OBSERVATION_COUNT = 1000
 randx = rng.integers(1023, size=100)
 randy = rng.integers(1023, size=100)
 
-latest_va = {'load1': lib.VA('load1',randx,randy),
-             'load2': lib.VA('load2',randx,randy),
-             'load3': lib.VA('load3',randx,randy),
-             'load4': lib.VA('load4',randx,randy),
-             'load5': lib.VA('load5',randx,randy),
-             'load6': lib.VA('load6',randx,randy),
-             'load7': lib.VA('load7',randx,randy),
-             'load8': lib.VA('load8',randx,randy),}
+latest_va = {'load1': lib.VA('load1', randx, randy),
+             'load2': lib.VA('load2', randx, randy),
+             'load3': lib.VA('load3', randx, randy),
+             'load4': lib.VA('load4', randx, randy),
+             'load5': lib.VA('load5', randx, randy),
+             'load6': lib.VA('load6', randx, randy),
+             'load7': lib.VA('load7', randx, randy),
+             'load8': lib.VA('load8', randx, randy),}
 
 def va_updater(volts_amps: lib.VA) -> None:
     """Callback for updating VA"""
@@ -47,6 +47,27 @@ def va_updater(volts_amps: lib.VA) -> None:
 
 TRIM_FREQ = 200 # trim every N rows
 TRIM_SIZE = 10000 # size of raw file to retain
+
+def make_sample_line(now_s: str, samples: lib.VA) -> str:
+    """sample data is for debugging"""
+    sample_v_mean: float = np.mean(samples.volts)
+    sample_v_stdev: float = np.std(samples.volts)
+    sample_a_mean: float = np.mean(samples.amps)
+    sample_a_stdev: float = np.std(samples.amps)
+
+    sample_line: str = (f'{now_s}\t{samples.load}'
+                        f'\t{sample_v_mean}\t{sample_v_stdev}'
+                        f'\t{sample_a_mean}\t{sample_a_stdev}')
+    return sample_line
+
+def make_real_old_format_line(now_s: str, volts_amps: lib.VA) -> str:
+    """old format is for the raw data file"""
+    pwr: float = lib.average_power_watts(volts_amps.volts, volts_amps.amps)
+    vrms: float = lib.rms(volts_amps.volts)
+    arms: float = lib.rms(volts_amps.amps)
+    load_s: str = volts_amps.load
+    real_old_format_line: str = f'{now_s}\t{load_s}\t{pwr}\t{vrms}\t{arms}'
+    return real_old_format_line
 
 def data_writer() -> None:
     """Updates the raw file.
@@ -57,7 +78,9 @@ def data_writer() -> None:
     while True:
         try:
             # TODO: remove sample data, it's just for debugging
-            with open(RAW_DATA_FILENAME, 'ab') as sink, open(SAMPLE_DATA_FILENAME, 'ab') as sample_sink:
+            with open(RAW_DATA_FILENAME,
+                      'ab') as sink, open(SAMPLE_DATA_FILENAME,
+                                          'ab') as sample_sink:
                 for _ in range(TRIM_FREQ):
 
                     line = raw_queue.get()
@@ -73,12 +96,7 @@ def data_writer() -> None:
                     if not samples:
                         continue
 
-                    sample_v_mean: float = np.mean(samples.volts) #type:ignore
-                    sample_v_stdev: float = np.std(samples.volts) #type:ignore
-                    sample_a_mean: float = np.mean(samples.amps) #type:ignore
-                    sample_a_stdev: float = np.std(samples.amps) #type:ignore
- 
-                    sample_line: str = f'{now_s}\t{samples.load}\t{sample_v_mean}\t{sample_v_stdev}\t{sample_a_mean}\t{sample_a_stdev}'
+                    sample_line = make_sample_line(now_s, samples)
                     sample_sink.write(sample_line.encode('ascii'))
                     sample_sink.write(b'\n')
                     sample_sink.flush()
@@ -86,14 +104,9 @@ def data_writer() -> None:
                     zeroed: lib.VA = lib.zero_samples(samples)
                     lib.do_stats(zeroed.load, zeroed.volts, zeroed.amps)
                     volts_amps: lib.VA = lib.scale_samples(zeroed)
-
                     va_updater(volts_amps)
-                    pwr: float = lib.average_power_watts(volts_amps.volts,
-                                                  volts_amps.amps)
-                    vrms: float = lib.rms(volts_amps.volts)
-                    arms: float = lib.rms(volts_amps.amps)
-                    load_s: str = volts_amps.load
-                    real_old_format_line = f'{now_s}\t{load_s}\t{pwr}\t{vrms}\t{arms}'
+
+                    real_old_format_line = make_real_old_format_line(now_s, volts_amps)
                     sink.write(real_old_format_line.encode('ascii'))
                     sink.write(b'\n')
                     sink.flush()
@@ -213,8 +226,8 @@ def data() -> Any:
     """data"""
     print('data')
     loadlist = [{'load': va.load,
-                 'volts': va.volts.tolist(), #type:ignore
-                 'amps': va.amps.tolist()} #type:ignore
+                 'volts': va.volts.tolist(),
+                 'amps': va.amps.tolist()}
                 for va in latest_va.values()]
     json_payload = json.dumps(loadlist)
     return Response(json_payload, mimetype='application/json')
