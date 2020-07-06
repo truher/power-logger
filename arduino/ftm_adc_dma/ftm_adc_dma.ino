@@ -4,6 +4,8 @@
 // see ADC_Module.cpp
 // see DMAChannel.cpp
 
+char uidStr[17] = {0}; // the lower 2 bytes of the UID
+
 static const char alphabet[] = {
   '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
@@ -21,7 +23,7 @@ const uint8_t pinLED = 13;
 uint8_t LED_ON = true;
 
 //const uint32_t buffer_size = 1600;
-const uint32_t buffer_size = 10;
+const uint32_t buffer_size = 1000;
 DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer0[buffer_size];
 DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer1[buffer_size];
 char encoded_buf[(int)(buffer_size * 2 * 5 / 4) + 1];
@@ -75,12 +77,15 @@ void maybeRestart() {
 //    Serial.println();
 //  }
 
+  Serial.print(uidStr);
+  Serial.print("\tct0\t");  // TODO: real ct names
   encode_85((const unsigned char *)buffer0, buffer_size * 2, encoded_buf);
-  Serial.print("buffer0 ");
-  Serial.println(encoded_buf);
+  Serial.print(encoded_buf);  // TODO: this is volts
+  Serial.print("\t");
   encode_85((const unsigned char *)buffer1, buffer_size * 2, encoded_buf);
-  Serial.print("buffer1 ");
-  Serial.println(encoded_buf);
+  Serial.print(encoded_buf);  // TODO: this is amps
+  Serial.println();
+  Serial.send_now();
   
   //TODO: reconfigure ADC channels etc
   //delay(1000);
@@ -100,6 +105,7 @@ void dma_ch1_isr() {
 }
 
 void setup() {
+  snprintf(uidStr, sizeof(uidStr), "%08lX%08lX", SIM_UIDML, SIM_UIDL);
   Serial.begin(0);
   while (!Serial);  // this makes it hang until serial monitor is opened.  :-(
   pinMode(pinLED, OUTPUT);
@@ -227,4 +233,5 @@ void setup() {
 }
 
 void loop() {
+  // interrupts only
 }

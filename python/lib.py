@@ -4,12 +4,14 @@ from collections import namedtuple
 from dataclasses import dataclass
 from glob import glob
 from typing import Any, Callable, Dict, IO, List, NamedTuple, Optional
+import base64
 import binascii
 import itertools
 import math
 import operator
 import os
 import queue
+import struct
 import sys
 import time
 from serial.threaded import Packetizer, ReaderThread #type:ignore
@@ -249,45 +251,29 @@ def refresh_serials(serials: List[ReaderThread],
 
     return serials
 
-# avoid creating the bases for every row, create it once
-def interpolator(samples: int) -> Callable[[List[int]], List[float]]:
-    """Returns an interpolator function."""
-    # x vals for observations
-    interp_xp = np.linspace(0, samples - 1, samples)
-    # x vals for interpolations, adds in-between vals
-    interp_x = np.linspace(0, samples - 1, 2 * samples - 1)
-    def f_interp(cumulative: List[int]) -> List[float]:
-        """Interpolate the list.
-        Returns:
-            An ndarray containing the interpolated samples
-        """
-        # the slice here is for a performance experiment TODO remove it.
-        # return np.interp(interp_x, interp_xp[0:len(cumulative)], cumulative) #type:ignore
-        return np.interp(interp_x, interp_xp, cumulative) #type:ignore
-    return f_interp
-
 # interpret one row
-def bytes_to_array(interp: Callable[[List[int]], List[float]],
-                   all_fields: List[bytes], data_col: int, first_col: int,
-                   trim_first: bool) -> Optional[List[float]]:
+def bytes_to_array(all_fields: List[bytes], data_col: int) -> Optional[List[float]]:
     """Decode one sample series.
     Returns:
         An ndarray containing the interpolated samples
     """
     try:
         field: bytes = all_fields[data_col]
-        decoded: bytes = binascii.unhexlify(field)
-        first: int = int(all_fields[first_col])
-        offsetted = (y-128 for y in decoded)
-        cumulative = list(itertools.accumulate(offsetted, func=operator.add, initial=first))
-        # TODO: stop encoding the first delta as zero
-        cumulative.pop(0)
-        interpolated: List[float] = interp(cumulative)
-        if trim_first:
-            interpolated = interpolated[1:]
-        else:
-            interpolated = interpolated[:-1]
-        return interpolated
+        decoded: bytes = base64.b85decode(field)
+        unpacked: List[int] = struct.unpack('h'*(len(decoded)//2), decoded) # maybe should be np.array?
+#        decoded: bytes = binascii.unhexlify(field)
+#        first: int = int(all_fields[first_col])
+#        offsetted = (y-128 for y in decoded)
+#        cumulative = list(itertools.accumulate(offsetted, func=operator.add, initial=first))
+#        # TODO: stop encoding the first delta as zero
+#        cumulative.pop(0)
+#        interpolated: List[float] = interp(cumulative)
+#        if trim_first:
+#            interpolated = interpolated[1:]
+#        else:
+#            interpolated = interpolated[:-1]
+#        return interpolated
+        return unpacked
     except (IndexError, TypeError, ValueError) as error:
         print(error)
         print(f'bytes_to_array ignore broken line: {all_fields}', file=sys.stderr)
@@ -305,25 +291,17 @@ def goodrow(fields: List[bytes]) -> bool:
     if fields is None:
         print('skip empty row')
         return False
-    if len(fields) != 8:
+#    if len(fields) != 8:
+    if len(fields) != 5:
         print(f'skip row len {len(fields)}')
         print(fields)
         return False
-    if fields[1] != b'0':
-        print(f'skip row err {fields[1]!r}')
-        return False
+#    if fields[1] != b'0':
+#        print(f'skip row err {fields[1]!r}')
+#        return False
     return True
 
 from config import loadnames
-## FOR A PAIR OF LEONARDOS WITH EMONTX SHIELDS
-#loadnames = {b"5737333034370D0E14ct1": 'load1',
-#             b"5737333034370D0E14ct2": 'load2',
-#             b"5737333034370D0E14ct3": 'load3',
-#             b"5737333034370D0E14ct4": 'load4',
-#             b"5737333034370A220Dct1": 'load5',
-#             b"5737333034370A220Dct2": 'load6',
-#             b"5737333034370A220Dct3": 'load7',
-#             b"5737333034370A220Dct4": 'load8'}
 
 def load(loadnames: Dict[bytes, str], fields: List[bytes]) -> str:
     """Maps arduino fields to load names.
@@ -334,7 +312,7 @@ def load(loadnames: Dict[bytes, str], fields: List[bytes]) -> str:
     Returns:
         Load name
     """
-    return loadnames[fields[2]+fields[3]]
+    return loadnames[fields[1]+fields[2]]
 
 # see
 # https://docs.google.com/spreadsheets/d/1L5l22Gl8_NVvAKYv-z71Cd4lBbWYdaJ1Pb2_rq0OKFM/edit#
@@ -445,7 +423,6 @@ def scale_samples(va: VA) -> VA:
     return VA(va.load, volts, amps)
 
 def decode_and_interpolate(loadnames: Dict[bytes, str],
-                           interp: Callable[[List[int]], List[float]],
                            line: bytes) -> Optional[VA]:
     """Decodes and interpolates sample series.
 
@@ -454,11 +431,10 @@ def decode_and_interpolate(loadnames: Dict[bytes, str],
     between the samples and trim the ends.
 
     Args:
-        interp: function that actually does the interpolation
         line: raw (encoded) input from arduino
 
     Returns:
-        A VA named tuple containing interpolated and trimmed sample series,
+        A VA named tuple containing sample series,
         or None, for invalid input
     """
     fields: List[bytes] = line.split()
@@ -469,12 +445,12 @@ def decode_and_interpolate(loadnames: Dict[bytes, str],
     load_name_s: str = load(loadnames, fields)
 
     # volts is the first observation, so trim the first value
-    volt_samples: Optional[List[float]] = bytes_to_array(interp, fields, 5, 4, True)
+    volt_samples: Optional[List[float]] = bytes_to_array(fields, 3)
     if volt_samples is None:
         return None # skip uninterpretable rows
 
     # amps is the second observation, so trim the last value
-    amp_samples: Optional[List[float]] = bytes_to_array(interp, fields, 7, 6, False)
+    amp_samples: Optional[List[float]] = bytes_to_array(fields, 4)
     if amp_samples is None:
         return None # skip uninterpretable rows
 

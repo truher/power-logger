@@ -1,6 +1,7 @@
 """Test the library."""
 from __future__ import annotations
 from typing import List
+import base64
 import unittest
 import numpy as np
 import lib
@@ -70,30 +71,18 @@ class TestLib(unittest.TestCase):
 
     def test_bytes_to_array(self) -> None:
         """Tests decoding."""
-        def interp(samples: List[int])->List[float]:
-            return samples #type:ignore
         # no data
-        self.assertIsNone(lib.bytes_to_array(interp, [], 0, 0, True))
+        self.assertIsNone(lib.bytes_to_array([], 0))
         # data col out of range
-        self.assertIsNone(lib.bytes_to_array(interp, [b'asdf'], 5, 4, True))
-        self.assertIsNone(lib.bytes_to_array(interp, [b'asdf'], 5, 4, True))
+        self.assertIsNone(lib.bytes_to_array([b'asdf'], 10))
         # if we observe 10,11,12,13,14
-        # then we record first = 10, deltas = 0,1,2,3,4
-        # add 128, hex, so 80, 81, 81, 81, 81
-        # note the first observation needs to be zero TODO fix that
-        # note the interpolator is a passthrough, and we trim the first
-        data = [b'10', b'8081818181']
-        result = lib.bytes_to_array(interp, data, 1, 0, True)
+        y = base64.b85encode(bytearray(np.array([10,11,12,13,14]).astype(np.int16)))
+        self.assertEqual(b'3IGcL3;+!P4gd', y)
+        data = [y]
+        result = lib.bytes_to_array(data, 0)
+        self.assertIsNotNone(result)
         if result:
-            self.assertCountEqual( [11, 12, 13, 14], result)
-
-    def test_interpolator(self) -> None:
-        """Tests interpolation."""
-        interp = lib.interpolator(5)
-        result = interp([1, 2, 3, 4, 5])
-        # interpolates the midpoints
-        self.assertEqual(9, len(result))
-        self.assertCountEqual([1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5], result)
+            self.assertCountEqual( [10, 11, 12, 13, 14], result)
 
     def test_goodrow(self) -> None:
         """Tests invalidity detection."""
@@ -101,41 +90,30 @@ class TestLib(unittest.TestCase):
         self.assertFalse(lib.goodrow(None)) #type:ignore
         # empty => bad
         self.assertFalse(lib.goodrow([]))
-        # error col not zero => bad
+        # wrong field count => bad
         self.assertFalse(
             lib.goodrow([b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8']))
-        # error col zero => good
+        # right field count => good
         self.assertTrue(
-            lib.goodrow([b'1', b'0', b'3', b'4', b'5', b'6', b'7', b'8']))
+            lib.goodrow([b'1', b'2', b'3', b'4', b'5']))
 
     def test_decode_and_interpolate(self) -> None:
         """Tests decoding and interpolation together."""
-        interp = lib.interpolator(5)
+        # interpolation is gone, so this is all there is
         # volts: 10 11 12 13 14
         # amps:  20 21 22 23 24
-        # interpolation (volts is first):
-        # volts: 10.0      11.0      12.0      13.0      14.0
-        # amps:       20.0      21.0      22.0      23.0      24.0
-        # interpolated:
-        # volts: 10.0 10.5 11.0 11.5 12.0 12.5 13.0 13.5 14.0
-        # amps:       20.0 20.5 21.0 21.5 22.0 22.5 23.0 23.5 24.0
-        # trimmed:
-        # volts:      10.5 11.0 11.5 12.0 12.5 13.0 13.5 14.0
-        # amps:       20.0 20.5 21.0 21.5 22.0 22.5 23.0 23.5
-        #
         volts_amps = lib.decode_and_interpolate(
-            {b'5737333034370A220Dct1': 'foo'},
-            interp,
-            b'x 0 5737333034370A220D ct1 10 8081818181 20 8081818181')
+            {b'barct1': 'foo'},
+            b'0 bar ct1 3IGcL3;+!P4gd 6aW<f762Cj7yt')
         self.assertIsNotNone(volts_amps)
         if volts_amps: # this is for mypy
-            self.assertEqual(8, len(volts_amps.volts))
-            self.assertEqual(8, len(volts_amps.amps))
+            self.assertEqual(5, len(volts_amps.volts))
+            self.assertEqual(5, len(volts_amps.amps))
             self.assertCountEqual(
-                [10.5, 11.0, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0],
+                [10.0, 11.0, 12.0, 13.0, 14.0],
                 volts_amps.volts)
             self.assertCountEqual(
-                [20.0, 20.5, 21.0, 21.5, 22.0, 22.5, 23.0, 23.5],
+                [20.0, 21.0, 22.0, 23.0, 24.0],
                 volts_amps.amps)
 
     def test_average_power_watts(self) -> None:
@@ -153,16 +131,14 @@ class TestLib(unittest.TestCase):
 
     def test_interpolation_and_power(self) -> None:
         """Tests interpolation and power calculation together."""
-        interp = lib.interpolator(5)
         # same as above
         volts_amps = lib.decode_and_interpolate(
-            {b'5737333034370A220Dct1': 'foo'},
-            interp,
-            b'x 0 5737333034370A220D ct1 10 8081818181 20 8081818181')
+            {b'barct1': 'foo'},
+            b'0 bar ct1 3IGcL3;+!P4gd 6aW<f762Cj7yt')
         self.assertIsNotNone(volts_amps)
         if volts_amps: # this is for mypy
             pwr = lib.average_power_watts(volts_amps.volts, volts_amps.amps)
-            self.assertAlmostEqual(267.75, pwr, places=3)
+            self.assertAlmostEqual(266.0, pwr, places=3)
             self.assertEqual('foo', volts_amps.load)
 
     def test_rms(self) -> None:
@@ -170,7 +146,7 @@ class TestLib(unittest.TestCase):
         self.assertAlmostEqual(2.9154759, lib.rms(x)) #type:ignore
 
     def test_load(self) -> None:
-        x = lib.load({b'cd': 'e'}, [b"a", b"b", b"c", b"d"])
+        x = lib.load({b'bc': 'e'}, [b"a", b"b", b"c", b"d"])
         self.assertEqual("e", x)
 
 if __name__ == '__main__':

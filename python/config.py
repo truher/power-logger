@@ -1,3 +1,6 @@
+# FOR TEENSY, uses UID
+loadnames = {b"4E454887900A0030ct0": "load1"}
+
 # FOR A PAIR OF LEONARDOS WITH EMONTX SHIELDS
 #loadnames = {b"5737333034370D0E14ct1": 'load1',
 #             b"5737333034370D0E14ct2": 'load2',
@@ -9,20 +12,20 @@
 #             b"5737333034370A220Dct4": 'load8'}
 
 # FOR A SINGLE MEGA WITH CUSTOM SHIELD
-loadnames = {b"6E756E6B776F000C02ct2": 'load1',
-             b"6E756E6B776F000C02ct3": 'load2',
-             b"6E756E6B776F000C02ct4": 'load3',
-             b"6E756E6B776F000C02ct5": 'load4',
-             b"6E756E6B776F000C02ct6": 'load5',
-             b"6E756E6B776F000C02ct7": 'load6',
-             b"6E756E6B776F000C02ct8": 'load7',
-             b"6E756E6B776F000C02ct9": 'load8',
-             b"6E756E6B776F000C02ct10": 'load9',
-             b"6E756E6B776F000C02ct11": 'load10',
-             b"6E756E6B776F000C02ct12": 'load11',
-             b"6E756E6B776F000C02ct13": 'load12',
-             b"6E756E6B776F000C02ct14": 'load13',
-             b"6E756E6B776F000C02ct15": 'load14'}
+#loadnames = {b"6E756E6B776F000C02ct2": 'load1',
+#             b"6E756E6B776F000C02ct3": 'load2',
+#             b"6E756E6B776F000C02ct4": 'load3',
+#             b"6E756E6B776F000C02ct5": 'load4',
+#             b"6E756E6B776F000C02ct6": 'load5',
+#             b"6E756E6B776F000C02ct7": 'load6',
+#             b"6E756E6B776F000C02ct8": 'load7',
+#             b"6E756E6B776F000C02ct9": 'load8',
+#             b"6E756E6B776F000C02ct10": 'load9',
+#             b"6E756E6B776F000C02ct11": 'load10',
+#             b"6E756E6B776F000C02ct12": 'load11',
+#             b"6E756E6B776F000C02ct13": 'load12',
+#             b"6E756E6B776F000C02ct14": 'load13',
+#             b"6E756E6B776F000C02ct15": 'load14'}
 
 # see
 # https://docs.google.com/spreadsheets/d/1L5l22Gl8_NVvAKYv-z71Cd4lBbWYdaJ1Pb2_rq0OKFM/edit#

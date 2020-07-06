@@ -28,7 +28,6 @@ raw_queue: queue.SimpleQueue[bytes] = queue.SimpleQueue()
 
 # arduino takes batches of 1000 points
 OBSERVATION_COUNT = 1000
-interpolator = lib.interpolator(OBSERVATION_COUNT)
 
 randx = rng.integers(1023, size=100)
 randy = rng.integers(1023, size=100)
@@ -70,7 +69,7 @@ def data_writer() -> None:
                     old_format_line: bytes = now_b + b' ' + line
 
                     samples: Optional[lib.VA] = lib.decode_and_interpolate(
-                        loadnames, interpolator, old_format_line)
+                        loadnames, old_format_line)
                     if not samples:
                         continue
 
