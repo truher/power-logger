@@ -68,12 +68,12 @@ void maybeRestart() {
 
   FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(0);  // turn off the timer
 
-  for (int i = 0; i < buffer_size; ++i) {
-    Serial.print(buffer0[i]);
-    Serial.print(", ");  
-    Serial.print(buffer1[i]);
-    Serial.println();
-  }
+//  for (int i = 0; i < buffer_size; ++i) {
+//    Serial.print(buffer0[i]);
+//    Serial.print(", ");  
+//    Serial.print(buffer1[i]);
+//    Serial.println();
+//  }
 
   encode_85((const unsigned char *)buffer0, buffer_size * 2, encoded_buf);
   Serial.print("buffer0 ");
