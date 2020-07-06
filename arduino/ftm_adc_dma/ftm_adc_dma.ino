@@ -20,7 +20,6 @@ static const char alphabet[] = {
 };
 
 const uint8_t pinLED = 13;
-uint8_t LED_ON = true;
 
 //const uint32_t buffer_size = 1600;
 const uint32_t buffer_size = 1000;
@@ -45,16 +44,6 @@ void encode_85(const unsigned char* in, uint32_t len, char* out) {
   *out = 0;
 }
 
-void toggleLED() {
-    if (LED_ON == true) {
-      digitalWriteFast(pinLED, HIGH);
-    }
-    else {
-      digitalWriteFast(pinLED, LOW);
-    }
-    LED_ON = !LED_ON;
-}
-
 void restartTimer() {
   DMA_SERQ = 0;  // enable DMA channel 0
   DMA_SERQ = 1;  // enable DMA channel 1
@@ -70,12 +59,7 @@ void maybeRestart() {
 
   FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(0);  // turn off the timer
 
-//  for (int i = 0; i < buffer_size; ++i) {
-//    Serial.print(buffer0[i]);
-//    Serial.print(", ");  
-//    Serial.print(buffer1[i]);
-//    Serial.println();
-//  }
+  digitalWriteFast(pinLED, HIGH);
 
   Serial.print(uidStr);
   Serial.print("\tct0\t");  // TODO: real ct names
@@ -88,9 +72,8 @@ void maybeRestart() {
   Serial.send_now();
   
   //TODO: reconfigure ADC channels etc
-  //delay(1000);
 
-  toggleLED();
+  digitalWriteFast(pinLED, LOW);
   restartTimer();
 }
 
