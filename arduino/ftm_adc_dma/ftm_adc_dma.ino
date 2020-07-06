@@ -4,13 +4,44 @@
 // see ADC_Module.cpp
 // see DMAChannel.cpp
 
+static const char alphabet[] = {
+  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
+  'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
+  'U', 'V', 'W', 'X', 'Y', 'Z',
+  'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
+  'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+  'u', 'v', 'w', 'x', 'y', 'z',
+  '!', '#', '$', '%', '&', '(', ')', '*', '+', '-',
+  ';', '<', '=', '>', '?', '@', '^', '_', '`', '{',
+  '|', '}', '~'
+};
+
 const uint8_t pinLED = 13;
 uint8_t LED_ON = true;
 
 //const uint32_t buffer_size = 1600;
-const uint32_t buffer_size = 1000;
+const uint32_t buffer_size = 10;
 DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer0[buffer_size];
 DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer1[buffer_size];
+char encoded_buf[(int)(buffer_size * 2 * 5 / 4) + 1];
+  
+void encode_85(const unsigned char* in, uint32_t len, char* out) {
+  while (len) {
+    uint32_t in_chunk = 0;
+    for (int8_t cnt = 24; cnt >= 0; cnt -= 8) {
+      in_chunk |= *in++ << cnt;
+      if (--len == 0)
+        break;
+    }
+    for (int8_t out_offset = 4; out_offset >= 0; out_offset--) {
+      out[out_offset] = alphabet[in_chunk % 85];
+      in_chunk /= 85;
+    }
+    out += 5;
+  }
+  *out = 0;
+}
 
 void toggleLED() {
     if (LED_ON == true) {
@@ -43,6 +74,13 @@ void maybeRestart() {
     Serial.print(buffer1[i]);
     Serial.println();
   }
+
+  encode_85((const unsigned char *)buffer0, buffer_size * 2, encoded_buf);
+  Serial.print("buffer0 ");
+  Serial.println(encoded_buf);
+  encode_85((const unsigned char *)buffer1, buffer_size * 2, encoded_buf);
+  Serial.print("buffer1 ");
+  Serial.println(encoded_buf);
   
   //TODO: reconfigure ADC channels etc
   //delay(1000);
