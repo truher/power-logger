@@ -1,3 +1,4 @@
+"""configuration"""
 # FOR TEENSY, uses UID
 loadnames = {b"4E454887900A0030ct0": "load1"}
 
@@ -32,9 +33,9 @@ loadnames = {b"4E454887900A0030ct0": "load1"}
 # sample period of about a minute
 
 # Vrms, according to Fluke
-actual_rms_volts = 120.3
+ACTUAL_RMS_VOLTS = 120.3
 # Arms, according to Extech
-actual_rms_amps = 2.05
+ACTUAL_RMS_AMPS = 2.05
 
 # mean Vrms from data_sample.csv
 # TODO: make these right

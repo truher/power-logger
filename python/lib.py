@@ -1,25 +1,23 @@
 """Library for power logging."""
 from __future__ import annotations
-from collections import namedtuple
 from dataclasses import dataclass
 from glob import glob
-from typing import Any, Callable, Dict, IO, List, NamedTuple, Optional
+from typing import Callable, Dict, List, NamedTuple, Optional
 import base64
-import binascii
-import itertools
 import math
-import operator
 import os
 import queue
-import struct
 import sys
 import time
 from serial.threaded import Packetizer, ReaderThread #type:ignore
 from scipy import integrate #type:ignore
 import numpy as np
 import pandas as pd
-
 import serial #type:ignore
+from config import ACTUAL_RMS_VOLTS
+from config import ACTUAL_RMS_AMPS
+from config import scale_rms_volts
+from config import scale_rms_amps
 
 class QueueLine(Packetizer): #type:ignore
     """Handles input within one reader thread."""
@@ -169,14 +167,11 @@ def make_hourly(raw_data: pd.DataFrame) -> pd.DataFrame:
     return hourly #type:ignore
 
 # TODO: add power here
-# TODO: use a class instead
-# This NamedTuple exists in order to pass null
-# load should be STRING
-#VA = namedtuple('VA', ['load', 'volts', 'amps'])
 class VA(NamedTuple):
+    """one named observation of volts and amps series"""
     load: str
-    volts: np.ndarray[float]
-    amps: np.ndarray[float]
+    volts: np.ndarray[np.float64] # pylint: disable=E1136  # pylint/issues/3139
+    amps: np.ndarray[np.float64] # pylint: disable=E1136  # pylint/issues/3139
 
 def trim(filename: str, count: int) -> None:
     """Read the file and write out the last <count> lines."""
@@ -252,7 +247,8 @@ def refresh_serials(serials: List[ReaderThread],
     return serials
 
 # interpret one row
-def bytes_to_array(all_fields: List[bytes], data_col: int) -> Optional[np.ndarray[np.int16]]:
+def bytes_to_array(all_fields: List[bytes],
+                   data_col: int) -> Optional[np.ndarray[np.float64]]: # pylint: disable=E1136
     """Decode one sample series.
     Returns:
         An ndarray containing the samples
@@ -260,8 +256,9 @@ def bytes_to_array(all_fields: List[bytes], data_col: int) -> Optional[np.ndarra
     try:
         field: bytes = all_fields[data_col]
         decoded: bytes = base64.b85decode(field)
-        unpacked: np.ndarray[np.int16] = np.frombuffer(decoded, dtype='int16')
-        return unpacked
+        unpacked: np.ndarray[np.int16] = ( # pylint: disable=E1136  # pylint/issues/3139
+            np.frombuffer(decoded, dtype='int16')) #type:ignore
+        return unpacked.astype(np.float64)
     except (IndexError, TypeError, ValueError) as error:
         print(error)
         print(f'bytes_to_array ignore broken line: {all_fields}', file=sys.stderr)
@@ -279,17 +276,11 @@ def goodrow(fields: List[bytes]) -> bool:
     if fields is None:
         print('skip empty row')
         return False
-#    if len(fields) != 8:
     if len(fields) != 5:
         print(f'skip row len {len(fields)}')
         print(fields)
         return False
-#    if fields[1] != b'0':
-#        print(f'skip row err {fields[1]!r}')
-#        return False
     return True
-
-from config import loadnames
 
 def load(loadnames: Dict[bytes, str], fields: List[bytes]) -> str:
     """Maps arduino fields to load names.
@@ -302,44 +293,23 @@ def load(loadnames: Dict[bytes, str], fields: List[bytes]) -> str:
     """
     return loadnames[fields[1]+fields[2]]
 
-# see
-# https://docs.google.com/spreadsheets/d/1L5l22Gl8_NVvAKYv-z71Cd4lBbWYdaJ1Pb2_rq0OKFM/edit#
-# sample period of about a minute
-
-# Vrms, according to Fluke
-from config import actual_rms_volts
-#actual_rms_volts = 120.3
-# Arms, according to Extech
-from config import actual_rms_amps
-#actual_rms_amps = 2.05
-
-# mean Vrms from data_sample.csv
-#from config import sample_rms_volts
-#sample_rms_volts = [171.645, 171.720, 171.648, 171.727, 172.793, 172.964, 172.780, 172.953]
-# mean Arms from data_sample.csv
-#from config import sample_rms_amps
-#sample_rms_amps = [6.985, 6.799, 6.763, 6.817, 6.786, 6.898, 6.794, 6.785]
-
-from config import scale_rms_volts
-#scale_rms_volts = dict(zip(loadnames.values(), sample_rms_volts))
-from config import scale_rms_amps
-#scale_rms_amps = dict(zip(loadnames.values(), sample_rms_amps))
-
-
 @dataclass
 class Sums:
+    """sums"""
     count: int = 0
     total: float = 0
     sq_total: float = 0
 
 @dataclass
 class Stats:
+    """stats"""
     count: int
     mean: float
     rms: float
 
 @dataclass
 class LoadSums:
+    """load sums"""
     name: str
     vsums: Sums
     asums: Sums
@@ -360,32 +330,34 @@ allsums = {'load1': LoadSums('load1', Sums(), Sums()),
            'load13': LoadSums('load13', Sums(), Sums()),
            'load14': LoadSums('load14', Sums(), Sums())}
 
-def update_stats(samples: List[float], s: Sums) -> None:
+def update_stats(samples: List[float], sums: Sums) -> None:
     """Keeps running stats
     Args:
         samples: an ndarray
     """
     for sample in samples:
-        s.total += sample
-        s.sq_total += sample * sample
-        s.count += 1
+        sums.total += sample
+        sums.sq_total += sample * sample
+        sums.count += 1
 
 def dump_stats(sums: Sums) -> Stats:
     """Calculate count, mean, vms"""
     if sums.count == 0:
-        return Stats(0,0,0)
+        return Stats(0, 0, 0)
     return Stats(sums.count, sums.total/sums.count,
-            math.sqrt(sums.sq_total/sums.count))
+                 math.sqrt(sums.sq_total/sums.count))
 
 def print_stats(lsums: LoadSums) -> None:
     """print a summary of stats"""
     vstats: Stats = dump_stats(lsums.vsums)
     astats: Stats = dump_stats(lsums.asums)
-    print(f'{lsums.name} {vstats.count} {vstats.mean} {vstats.rms} {astats.count} {astats.mean} {astats.rms}')
+    print(f'{lsums.name} {vstats.count} {vstats.mean} {vstats.rms}'
+          f' {astats.count} {astats.mean} {astats.rms}')
 
 def do_stats(load_name_s: str,
              volt_samples: List[float],
              amp_samples: List[float]) -> None:
+    """maintain stats"""
     lsums: LoadSums = allsums[load_name_s]
     update_stats(volt_samples, lsums.vsums)
     update_stats(amp_samples, lsums.asums)
@@ -398,17 +370,21 @@ def zero_samples(samples: VA) -> VA:
     Since these are AC coupled measurements, and we look for
     a long time, the zero is just the mean.
     """
-    volts: List[float] = samples.volts - np.mean(samples.volts) #type:ignore
-    amps: List[float] = samples.amps - np.mean(samples.amps) #type:ignore
+    volts: np.ndarray[np.float64] = ( # pylint: disable=E1136  # pylint/issues/3139
+        samples.volts - np.mean(samples.volts))
+    amps: np.ndarray[np.float64] = ( # pylint: disable=E1136  # pylint/issues/3139
+        samples.amps - np.mean(samples.amps))
     return VA(samples.load, volts, amps)
 
-def scale_samples(va: VA) -> VA:
+def scale_samples(samples: VA) -> VA:
     """Transforms zeroed samples to measures"""
-    scale_vrms: float = scale_rms_volts[va.load]
-    scale_arms: float = scale_rms_amps[va.load]
-    volts: List[float] = va.volts * actual_rms_volts / scale_vrms #type:ignore
-    amps: List[float] = va.amps * actual_rms_amps / scale_arms #type:ignore
-    return VA(va.load, volts, amps)
+    scale_vrms: float = scale_rms_volts[samples.load]
+    scale_arms: float = scale_rms_amps[samples.load]
+    volts: np.ndarray[np.float64] = ( # pylint: disable=E1136  # pylint/issues/3139
+        samples.volts * ACTUAL_RMS_VOLTS / scale_vrms)
+    amps: np.ndarray[np.float64] = ( # pylint: disable=E1136  # pylint/issues/3139
+        samples.amps * ACTUAL_RMS_AMPS / scale_arms)
+    return VA(samples.load, volts, amps)
 
 def decode_and_interpolate(loadnames: Dict[bytes, str],
                            line: bytes) -> Optional[VA]:
@@ -433,19 +409,21 @@ def decode_and_interpolate(loadnames: Dict[bytes, str],
     load_name_s: str = load(loadnames, fields)
 
     # volts is the first observation, so trim the first value
-    volt_samples: Optional[List[float]] = bytes_to_array(fields, 3)
+    volt_samples: Optional[np.ndarray[np.float64]] = ( # pylint: disable=E1136  # pylint/issues/3139
+        bytes_to_array(fields, 3))
     if volt_samples is None:
         return None # skip uninterpretable rows
 
     # amps is the second observation, so trim the last value
-    amp_samples: Optional[List[float]] = bytes_to_array(fields, 4)
+    amp_samples: Optional[np.ndarray[np.float64]] = ( # pylint: disable=E1136  # pylint/issues/3139
+        bytes_to_array(fields, 4))
     if amp_samples is None:
         return None # skip uninterpretable rows
 
     return VA(load_name_s, volt_samples, amp_samples)
 
 # TODO: add the multiply to VA
-def average_power_watts(volts: List[float], amps: List[float]) -> float:
+def average_power_watts(volts: np.ndarray[np.float64], amps: np.ndarray[np.float64]) -> float:
     """Calculates average power in watts.
 
     Args:
