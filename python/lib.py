@@ -175,8 +175,8 @@ def make_hourly(raw_data: pd.DataFrame) -> pd.DataFrame:
 #VA = namedtuple('VA', ['load', 'volts', 'amps'])
 class VA(NamedTuple):
     load: str
-    volts: List[float]
-    amps: List[float]
+    volts: np.ndarray[float]
+    amps: np.ndarray[float]
 
 def trim(filename: str, count: int) -> None:
     """Read the file and write out the last <count> lines."""
@@ -252,27 +252,15 @@ def refresh_serials(serials: List[ReaderThread],
     return serials
 
 # interpret one row
-def bytes_to_array(all_fields: List[bytes], data_col: int) -> Optional[List[float]]:
+def bytes_to_array(all_fields: List[bytes], data_col: int) -> Optional[np.ndarray[np.int16]]:
     """Decode one sample series.
     Returns:
-        An ndarray containing the interpolated samples
+        An ndarray containing the samples
     """
     try:
         field: bytes = all_fields[data_col]
         decoded: bytes = base64.b85decode(field)
-        unpacked: List[int] = struct.unpack('h'*(len(decoded)//2), decoded) # maybe should be np.array?
-#        decoded: bytes = binascii.unhexlify(field)
-#        first: int = int(all_fields[first_col])
-#        offsetted = (y-128 for y in decoded)
-#        cumulative = list(itertools.accumulate(offsetted, func=operator.add, initial=first))
-#        # TODO: stop encoding the first delta as zero
-#        cumulative.pop(0)
-#        interpolated: List[float] = interp(cumulative)
-#        if trim_first:
-#            interpolated = interpolated[1:]
-#        else:
-#            interpolated = interpolated[:-1]
-#        return interpolated
+        unpacked: np.ndarray[np.int16] = np.frombuffer(decoded, dtype='int16')
         return unpacked
     except (IndexError, TypeError, ValueError) as error:
         print(error)
