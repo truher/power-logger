@@ -52,6 +52,8 @@ uint32_t encode_85(const unsigned char* in, uint32_t len, char* out) {
 }
 
 void restartTimer() {
+  current_buffer_size = new_buffer_size;
+  set_length(current_buffer_size);
   DMA_SERQ = 0;  // enable DMA channel 0
   DMA_SERQ = 1;  // enable DMA channel 1
   FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(1);  // turn the timer back on
@@ -74,6 +76,8 @@ void maybeRestart() {
   Serial.print(uidStr);
   Serial.print("\tct");
   Serial.print(ct);         // TODO: real ct channels and names
+  Serial.print("\t");
+  Serial.print(current_buffer_size);
   Serial.print("\t");
   encoded_len = encode_85((const unsigned char *)buffer0, current_buffer_size * 2, encoded_buf);
   Serial.write(encoded_buf, encoded_len);  // TODO: this is volts
@@ -99,6 +103,17 @@ void dma_ch0_isr() {
 void dma_ch1_isr() {
   DMA_CINT = DMA_CINT_CINT(1);
   maybeRestart();
+}
+
+void set_length(uint16_t new_length) {
+  DMA_TCD0_CITER_ELINKNO = new_length;  // major loop size is buffer size (max 32k)
+  DMA_TCD1_CITER_ELINKNO = new_length;
+
+  DMA_TCD0_DLASTSGA = -2 * new_length;  // after major loop, go back to the start
+  DMA_TCD1_DLASTSGA = -2 * new_length;
+
+  DMA_TCD0_BITER_ELINKNO = new_length;  // major loop size is buffer size (max 32k)
+  DMA_TCD1_BITER_ELINKNO = new_length;
 }
 
 void setup() {
@@ -206,19 +221,22 @@ void setup() {
   DMA_TCD0_ATTR |= DMA_TCD_ATTR_DSIZE(DMA_TCD_ATTR_SIZE_16BIT); // write 16 bits at a time to dest
   DMA_TCD1_ATTR |= DMA_TCD_ATTR_DSIZE(DMA_TCD_ATTR_SIZE_16BIT);
 
-  DMA_TCD0_CITER_ELINKNO = current_buffer_size;  // major loop size is buffer size (max 32k)
-  DMA_TCD1_CITER_ELINKNO = current_buffer_size;
-
-  DMA_TCD0_DLASTSGA = -1 * sizeof buffer0;  // after major loop, go back to the start
-  DMA_TCD1_DLASTSGA = -1 * sizeof buffer1;
+  set_length(current_buffer_size);
+  
+//  DMA_TCD0_CITER_ELINKNO = current_buffer_size;  // major loop size is buffer size (max 32k)
+//  DMA_TCD1_CITER_ELINKNO = current_buffer_size;
+//
+//  DMA_TCD0_DLASTSGA = -2 * current_buffer_size;  // after major loop, go back to the start (bytes!)
+//  DMA_TCD1_DLASTSGA = -2 * current_buffer_size;
+//
+//  DMA_TCD0_BITER_ELINKNO = current_buffer_size;  // major loop size is buffer size (max 32k)
+//  DMA_TCD1_BITER_ELINKNO = current_buffer_size;
 
   DMA_TCD0_CSR = DMA_TCD_CSR_DREQ       // disable on completion
                | DMA_TCD_CSR_INTMAJOR;  // interrupt on completion
   DMA_TCD1_CSR = DMA_TCD_CSR_DREQ
                | DMA_TCD_CSR_INTMAJOR;
 
-  DMA_TCD0_BITER_ELINKNO = current_buffer_size;  // major loop size is buffer size (max 32k)
-  DMA_TCD1_BITER_ELINKNO = current_buffer_size;
 
   // DMA ENABLE
   

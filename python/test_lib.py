@@ -95,7 +95,7 @@ class TestLib(unittest.TestCase):
             lib.goodrow([b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8']))
         # right field count => good
         self.assertTrue(
-            lib.goodrow([b'1', b'2', b'3', b'4', b'5']))
+            lib.goodrow([b'date', b'uid', b'ct', b'len', b'buff1', b'buff2']))
 
     def test_decode_and_interpolate(self) -> None:
         """Tests decoding and interpolation together."""
@@ -104,7 +104,7 @@ class TestLib(unittest.TestCase):
         # amps:  20 21 22 23 24
         volts_amps = lib.decode_and_interpolate(
             {b'barct1': 'foo'},
-            b'0 bar ct1 3IGcL3;+!P4gd 6aW<f762Cj7yt')
+            b'0 bar ct1 5 3IGcL3;+!P4gd 6aW<f762Cj7yt')
         self.assertIsNotNone(volts_amps)
         if volts_amps: # this is for mypy
             self.assertEqual(5, len(volts_amps.volts))
@@ -135,7 +135,7 @@ class TestLib(unittest.TestCase):
         # same as above
         volts_amps = lib.decode_and_interpolate(
             {b'barct1': 'foo'},
-            b'0 bar ct1 3IGcL3;+!P4gd 6aW<f762Cj7yt')
+            b'0 bar ct1 5 3IGcL3;+!P4gd 6aW<f762Cj7yt')
         self.assertIsNotNone(volts_amps)
         if volts_amps: # this is for mypy
             pwr = lib.average_power_watts(volts_amps.volts, volts_amps.amps)

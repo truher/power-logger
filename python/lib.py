@@ -276,7 +276,7 @@ def goodrow(fields: List[bytes]) -> bool:
     if fields is None:
         print('skip empty row')
         return False
-    if len(fields) != 5:
+    if len(fields) != 6:
         print(f'skip row len {len(fields)}')
         print(fields)
         return False
@@ -389,6 +389,7 @@ def scale_samples(samples: VA) -> VA:
         samples.amps * ACTUAL_RMS_AMPS / scale_arms)
     return VA(samples.load, volts, amps)
 
+# date uid ct len b1 b2
 def decode_and_interpolate(loadnames: Dict[bytes, str],
                            line: bytes) -> Optional[VA]:
     """Decodes and interpolates sample series.
@@ -413,13 +414,13 @@ def decode_and_interpolate(loadnames: Dict[bytes, str],
 
     # volts is the first observation, so trim the first value
     volt_samples: Optional[np.ndarray[np.float64]] = ( # pylint: disable=E1136  # pylint/issues/3139
-        bytes_to_array(fields, 3))
+        bytes_to_array(fields, 4))
     if volt_samples is None:
         return None # skip uninterpretable rows
 
     # amps is the second observation, so trim the last value
     amp_samples: Optional[np.ndarray[np.float64]] = ( # pylint: disable=E1136  # pylint/issues/3139
-        bytes_to_array(fields, 4))
+        bytes_to_array(fields, 5))
     if amp_samples is None:
         return None # skip uninterpretable rows
 

@@ -26,9 +26,6 @@ rng = np.random.default_rng() #type:ignore
 
 raw_queue: queue.SimpleQueue[bytes] = queue.SimpleQueue()
 
-# arduino takes batches of 1000 points
-OBSERVATION_COUNT = 1000
-
 randx = rng.integers(1023, size=100)
 randy = rng.integers(1023, size=100)
 
