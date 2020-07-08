@@ -1,3 +1,4 @@
+// Copyright 2020 truher
 // Teensy 3.5 two-channel synchronized ADC
 //
 // see EEOL_2014APR24_AMP_CTRL_AN_01.pdf
@@ -21,13 +22,18 @@ static const char alphabet[] = {
 
 const uint8_t pinLED = 13;
 
-//const uint32_t buffer_size = 1600;
-const uint32_t buffer_size = 1000;
-DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer0[buffer_size];
-DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer1[buffer_size];
-char encoded_buf[(int)(buffer_size * 2 * 5 / 4) + 1];
-  
-void encode_85(const unsigned char* in, uint32_t len, char* out) {
+//const uint32_t MAX_BUFFER_SIZE = 1600; // 32767 but ideally divisible by 4 for b85... is that actually necessary?
+const uint32_t MAX_BUFFER_SIZE = 1000;  // in samples, which is 16b not 8b
+uint32_t current_buffer_size = 1000;
+uint32_t new_buffer_size = 1000; // for next round
+DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer0[MAX_BUFFER_SIZE];
+DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer1[MAX_BUFFER_SIZE];
+// 2 for sample width, 5/4 for b85, 1 for /0
+char encoded_buf[(int)(MAX_BUFFER_SIZE * 2 * 5 / 4) + 1];
+
+// returns the size of the encoded buffer, not including the terminating null
+uint32_t encode_85(const unsigned char* in, uint32_t len, char* out) {
+  char* out_start = out;
   while (len) {
     uint32_t in_chunk = 0;
     for (int8_t cnt = 24; cnt >= 0; cnt -= 8) {
@@ -42,6 +48,7 @@ void encode_85(const unsigned char* in, uint32_t len, char* out) {
     out += 5;
   }
   *out = 0;
+  return out - out_start;
 }
 
 void restartTimer() {
@@ -49,6 +56,9 @@ void restartTimer() {
   DMA_SERQ = 1;  // enable DMA channel 1
   FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(1);  // turn the timer back on
 }
+
+int ct = 0;
+uint32_t encoded_len = 0;
 
 // if neither channel is done, we shouldn't be here.
 // if one channel is done, let the other finish, it won't hurt anything.
@@ -62,18 +72,22 @@ void maybeRestart() {
   digitalWriteFast(pinLED, HIGH);
 
   Serial.print(uidStr);
-  Serial.print("\tct0\t");  // TODO: real ct names
-  encode_85((const unsigned char *)buffer0, buffer_size * 2, encoded_buf);
-  Serial.print(encoded_buf);  // TODO: this is volts
+  Serial.print("\tct");
+  Serial.print(ct);         // TODO: real ct channels and names
   Serial.print("\t");
-  encode_85((const unsigned char *)buffer1, buffer_size * 2, encoded_buf);
-  Serial.print(encoded_buf);  // TODO: this is amps
+  encoded_len = encode_85((const unsigned char *)buffer0, current_buffer_size * 2, encoded_buf);
+  Serial.write(encoded_buf, encoded_len);  // TODO: this is volts
+  Serial.print("\t");
+  encoded_len = encode_85((const unsigned char *)buffer1, current_buffer_size * 2, encoded_buf);
+  Serial.write(encoded_buf, encoded_len);  // TODO: this is amps
   Serial.println();
   Serial.send_now();
   
   //TODO: reconfigure ADC channels etc
 
   digitalWriteFast(pinLED, LOW);
+  ct += 1;
+  if (ct > 15) ct = 0;
   restartTimer();
 }
 
@@ -102,9 +116,11 @@ void setup() {
   FTM0_CNTIN = 0; // counter initial value
   FTM0_C0SC = FTM_CSC_ELSB | FTM_CSC_MSB; // output compare, high-true
   // FTM0_MOD = 32;  // modulo, for the counter, output high on overflow
+  // FTM0_MOD = 16000;  // about 200 us, like the old one
   FTM0_MOD = 16000;
   //FTM0_C0V = 16;  // match value, output low on match
-  FTM0_C0V = 8000;  // match value, output low on match
+  // FTM0_C0V = 8000;  // about 100 us
+  FTM0_C0V = 8000;
 
   // bga pin b11 (row b, column 11) is port c1 ("PTC1"), which is teensy pin 22 or a8
   PORTC_PCR1 = PORT_PCR_MUX(4) // in alternative 4, ftm0_ch0 goes to b11
@@ -190,8 +206,8 @@ void setup() {
   DMA_TCD0_ATTR |= DMA_TCD_ATTR_DSIZE(DMA_TCD_ATTR_SIZE_16BIT); // write 16 bits at a time to dest
   DMA_TCD1_ATTR |= DMA_TCD_ATTR_DSIZE(DMA_TCD_ATTR_SIZE_16BIT);
 
-  DMA_TCD0_CITER_ELINKNO = buffer_size;  // major loop size is buffer size (max 32k)
-  DMA_TCD1_CITER_ELINKNO = buffer_size;
+  DMA_TCD0_CITER_ELINKNO = current_buffer_size;  // major loop size is buffer size (max 32k)
+  DMA_TCD1_CITER_ELINKNO = current_buffer_size;
 
   DMA_TCD0_DLASTSGA = -1 * sizeof buffer0;  // after major loop, go back to the start
   DMA_TCD1_DLASTSGA = -1 * sizeof buffer1;
@@ -201,8 +217,8 @@ void setup() {
   DMA_TCD1_CSR = DMA_TCD_CSR_DREQ
                | DMA_TCD_CSR_INTMAJOR;
 
-  DMA_TCD0_BITER_ELINKNO = buffer_size;  // major loop size is buffer size (max 32k)
-  DMA_TCD1_BITER_ELINKNO = buffer_size;
+  DMA_TCD0_BITER_ELINKNO = current_buffer_size;  // major loop size is buffer size (max 32k)
+  DMA_TCD1_BITER_ELINKNO = current_buffer_size;
 
   // DMA ENABLE
   
@@ -215,6 +231,51 @@ void setup() {
   NVIC_ENABLE_IRQ(IRQ_DMA_CH1);
 }
 
+
+// figure out how to receive commands
+//
+// {c}{n}\r
+//
+// where {c} is one of:
+//
+//   F = frequency in hz
+//   C = channel number, or zero to scan
+//   L = length in samples
+//
+// and {n} is an int
+
+char cmd_buffer[100];
+
 void loop() {
-  // interrupts only
+  if (Serial.available()) {
+    size_t bytes_read = Serial.readBytesUntil('\r', cmd_buffer, sizeof(cmd_buffer) - 1);
+    if (bytes_read < 1) return;
+    cmd_buffer[bytes_read] = '\0';
+   switch(*cmd_buffer) {
+      case 'F':
+        Serial.print("found F: ");
+        if (bytes_read > 1) Serial.print(atoi(cmd_buffer+1));
+        Serial.println();
+        break;
+      case 'C':
+        Serial.print("found C: ");
+        if (bytes_read > 1) Serial.print(atoi(cmd_buffer+1));
+        Serial.println();
+        break;
+      case 'L': {
+        Serial.print("found L: ");
+        if (bytes_read < 2) return;
+        int length = atoi(cmd_buffer + 1);
+        if (length == 0) return;
+        new_buffer_size = length;
+        Serial.print("accepted new length: ");
+        Serial.print(new_buffer_size);
+        Serial.println();
+        break;
+      }
+      default:
+        Serial.print("unrecognized command: ");
+        Serial.println(cmd_buffer);
+    }
+  }
 }

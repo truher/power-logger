@@ -328,7 +328,9 @@ allsums = {'load1': LoadSums('load1', Sums(), Sums()),
            'load11': LoadSums('load11', Sums(), Sums()),
            'load12': LoadSums('load12', Sums(), Sums()),
            'load13': LoadSums('load13', Sums(), Sums()),
-           'load14': LoadSums('load14', Sums(), Sums())}
+           'load14': LoadSums('load14', Sums(), Sums()),
+           'load15': LoadSums('load15', Sums(), Sums()),
+           'load16': LoadSums('load16', Sums(), Sums())}
 
 def update_stats(samples: np.ndarray[np.float64], # pylint: disable=E1136  # pylint/issues/3139
                  sums: Sums) -> None:

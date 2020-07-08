@@ -1,6 +1,23 @@
 """configuration"""
 # FOR TEENSY, uses UID
-loadnames = {b"4E454887900A0030ct0": "load1"}
+loadnames = {
+b"4E454887900A0030ct0": "load1",
+b"4E454887900A0030ct1": "load2",
+b"4E454887900A0030ct2": "load3",
+b"4E454887900A0030ct3": "load4",
+b"4E454887900A0030ct4": "load5",
+b"4E454887900A0030ct5": "load6",
+b"4E454887900A0030ct6": "load7",
+b"4E454887900A0030ct7": "load8",
+b"4E454887900A0030ct8": "load9",
+b"4E454887900A0030ct9": "load10",
+b"4E454887900A0030ct10": "load11",
+b"4E454887900A0030ct11": "load12",
+b"4E454887900A0030ct12": "load13",
+b"4E454887900A0030ct13": "load14",
+b"4E454887900A0030ct14": "load15",
+b"4E454887900A0030ct15": "load16"
+}
 
 # FOR A PAIR OF LEONARDOS WITH EMONTX SHIELDS
 #loadnames = {b"5737333034370D0E14ct1": 'load1',
@@ -40,12 +57,16 @@ ACTUAL_RMS_AMPS = 2.05
 # mean Vrms from data_sample.csv
 # TODO: make these right
 #sample_rms_volts = [171.645, 171.720, 171.648, 171.727, 172.793, 172.964, 172.780, 172.953]
-sample_rms_volts = [171.645, 171.720, 171.648, 171.727, 172.793, 172.964, 172.780, 172.953,
-                    171.645, 171.720, 171.648, 171.727, 172.793, 172.964]
+sample_rms_volts = [171.645, 171.720, 171.648, 171.727,
+                    172.793, 172.964, 172.780, 172.953,
+                    171.645, 171.720, 171.648, 171.727,
+                    172.793, 172.964, 170.000, 170.000]
 # mean Arms from data_sample.csv
 #sample_rms_amps = [6.985, 6.799, 6.763, 6.817, 6.786, 6.898, 6.794, 6.785]
-sample_rms_amps = [6.985, 6.799, 6.763, 6.817, 6.786, 6.898, 6.794, 6.785,
-                   6.985, 6.799, 6.763, 6.817, 6.786, 6.898]
+sample_rms_amps = [6.985, 6.799, 6.763, 6.817,
+                   6.786, 6.898, 6.794, 6.785,
+                   6.985, 6.799, 6.763, 6.817,
+                   6.786, 6.898, 6.123, 6.123]
 
 scale_rms_volts = dict(zip(loadnames.values(), sample_rms_volts))
 scale_rms_amps = dict(zip(loadnames.values(), sample_rms_amps))
