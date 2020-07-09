@@ -276,7 +276,7 @@ def goodrow(fields: List[bytes]) -> bool:
     if fields is None:
         print('skip empty row')
         return False
-    if len(fields) != 6:
+    if len(fields) != 7:
         print(f'skip row len {len(fields)}')
         print(fields)
         return False
@@ -414,13 +414,13 @@ def decode_and_interpolate(loadnames: Dict[bytes, str],
 
     # volts is the first observation, so trim the first value
     volt_samples: Optional[np.ndarray[np.float64]] = ( # pylint: disable=E1136  # pylint/issues/3139
-        bytes_to_array(fields, 4))
+        bytes_to_array(fields, 5))
     if volt_samples is None:
         return None # skip uninterpretable rows
 
     # amps is the second observation, so trim the last value
     amp_samples: Optional[np.ndarray[np.float64]] = ( # pylint: disable=E1136  # pylint/issues/3139
-        bytes_to_array(fields, 5))
+        bytes_to_array(fields, 6))
     if amp_samples is None:
         return None # skip uninterpretable rows
 

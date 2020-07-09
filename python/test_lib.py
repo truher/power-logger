@@ -12,13 +12,13 @@ class TestLib(unittest.TestCase):
         """are the singletons working right?"""
         s01 = lib.Sums()
         s02 = lib.Sums()
-        lib.update_stats([1, 2, 3], s01)
+        lib.update_stats(np.array([1, 2, 3]).astype(np.float64), s01)
         self.assertEqual(3, s01.count)
         self.assertEqual(0, s02.count)
 
         sum_1 = lib.allsums['load1']
         sum_2 = lib.allsums['load2']
-        lib.update_stats([1, 2, 3], sum_1.vsums)
+        lib.update_stats(np.array([1, 2, 3]).astype(np.float64), sum_1.vsums)
         self.assertEqual(3, sum_1.vsums.count)
         self.assertEqual(0, sum_2.vsums.count)
         self.assertAlmostEqual(6, sum_1.vsums.total)
@@ -36,7 +36,7 @@ class TestLib(unittest.TestCase):
 
     def test_update_stats(self) -> None:
         """Tests stats calculations."""
-        x_in: List[float] = [1, 2, 3, 4, 5]
+        x_in: np.ndarray[np.float64] = np.array([1, 2, 3, 4, 5]).astype(np.float64)
         sums = lib.Sums()
         lib.update_stats(x_in, sums)
         self.assertEqual(5, sums.count)
@@ -95,7 +95,7 @@ class TestLib(unittest.TestCase):
             lib.goodrow([b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8']))
         # right field count => good
         self.assertTrue(
-            lib.goodrow([b'date', b'uid', b'ct', b'len', b'buff1', b'buff2']))
+            lib.goodrow([b'date', b'uid', b'ct', b'freq', b'len', b'buff1', b'buff2']))
 
     def test_decode_and_interpolate(self) -> None:
         """Tests decoding and interpolation together."""
@@ -104,7 +104,7 @@ class TestLib(unittest.TestCase):
         # amps:  20 21 22 23 24
         volts_amps = lib.decode_and_interpolate(
             {b'barct1': 'foo'},
-            b'0 bar ct1 5 3IGcL3;+!P4gd 6aW<f762Cj7yt')
+            b'0 bar ct1 10 5 3IGcL3;+!P4gd 6aW<f762Cj7yt')
         self.assertIsNotNone(volts_amps)
         if volts_amps: # this is for mypy
             self.assertEqual(5, len(volts_amps.volts))
@@ -135,7 +135,7 @@ class TestLib(unittest.TestCase):
         # same as above
         volts_amps = lib.decode_and_interpolate(
             {b'barct1': 'foo'},
-            b'0 bar ct1 5 3IGcL3;+!P4gd 6aW<f762Cj7yt')
+            b'0 bar ct1 10 5 3IGcL3;+!P4gd 6aW<f762Cj7yt')
         self.assertIsNotNone(volts_amps)
         if volts_amps: # this is for mypy
             pwr = lib.average_power_watts(volts_amps.volts, volts_amps.amps)
