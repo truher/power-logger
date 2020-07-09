@@ -25,11 +25,16 @@ const uint8_t pinLED = 13;
 //const uint32_t MAX_BUFFER_SIZE = 1600; // 32767 but ideally divisible by 4 for b85... is that actually necessary?
 const uint32_t MAX_BUFFER_SIZE = 1000;  // in samples, which is 16b not 8b
 uint32_t current_buffer_size = 1000;
+uint32_t current_frequency = -1;
+uint32_t current_channel = 0;   // this means "scan all"
 uint32_t new_buffer_size = 1000; // for next round
+uint32_t new_frequency = -1;     // for next round
+uint32_t new_channel = 0;
 DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer0[MAX_BUFFER_SIZE];
 DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer1[MAX_BUFFER_SIZE];
 // 2 for sample width, 5/4 for b85, 1 for /0
 char encoded_buf[(int)(MAX_BUFFER_SIZE * 2 * 5 / 4) + 1];
+
 
 // returns the size of the encoded buffer, not including the terminating null
 uint32_t encode_85(const unsigned char* in, uint32_t len, char* out) {
@@ -116,6 +121,9 @@ void set_length(uint16_t new_length) {
   DMA_TCD1_BITER_ELINKNO = new_length;
 }
 
+static const uint32_t CLOCK_SPEED = 0;  // in hz
+
+
 void setup() {
   snprintf(uidStr, sizeof(uidStr), "%08lX%08lX", SIM_UIDML, SIM_UIDL);
   Serial.begin(0);
@@ -137,14 +145,15 @@ void setup() {
   // FTM0_C0V = 8000;  // about 100 us
   FTM0_C0V = 8000;
 
+  // this is so we can see the clock externally
   // bga pin b11 (row b, column 11) is port c1 ("PTC1"), which is teensy pin 22 or a8
   PORTC_PCR1 = PORT_PCR_MUX(4) // in alternative 4, ftm0_ch0 goes to b11
              | PORT_PCR_DSE    // high drive strength
              | PORT_PCR_SRE;   // slow slew rate (?)
   
   FTM0_SC = FTM_SC_CLKS(1)   // set status: system clock
-            | FTM_SC_PS(0)   // no prescaling
-            | FTM_SC_TOIE;   // enable overflow interrupts
+            | FTM_SC_PS(0)   // no prescaling // TODO: use this for very slow freq?
+            | FTM_SC_TOIE;   // enable overflow interrupts // TODO remove?
 
   FTM0_EXTTRIG |= FTM_EXTTRIG_INITTRIGEN;  // FTM output trigger enable
   FTM0_MODE |= FTM_MODE_INIT;  // initialize the output
@@ -161,9 +170,12 @@ void setup() {
   ADC0_CFG1 |= ADC_CFG1_MODE(3);  // 16 bit
   ADC1_CFG1 |= ADC_CFG1_MODE(3);
 
-  ADC0_CFG2 |= ADC_CFG2_ADHSC   // high speed
+  ADC0_CFG2 |= ADC_CFG2_ADHSC   // high speed  // TODO: disable for slower speed?
             |  ADC_CFG2_MUXSEL; // select "b" channels
   ADC1_CFG2 |= ADC_CFG2_ADHSC;
+
+  // TODO: something about averageing (see SC3)
+  // TODO: something about calibration
 
   ADC0_SC2 |= ADC_SC2_ADTRG    // hardware trigger
            | ADC_SC2_DMAEN;    // dma enable
@@ -270,21 +282,33 @@ void loop() {
     if (bytes_read < 1) return;
     cmd_buffer[bytes_read] = '\0';
    switch(*cmd_buffer) {
-      case 'F':
+      case 'F': {
         Serial.print("found F: ");
-        if (bytes_read > 1) Serial.print(atoi(cmd_buffer+1));
+        if (bytes_read < 2) break;
+        int frequency = atoi(cmd_buffer + 1);
+        if (frequency <= 0) break;
+        new_frequency = frequency;
+        Serial.print("accepted new frequency: ");
+        Serial.print(new_frequency);
         Serial.println();
         break;
-      case 'C':
+      }
+      case 'C': {
         Serial.print("found C: ");
-        if (bytes_read > 1) Serial.print(atoi(cmd_buffer+1));
+        if (bytes_read < 2) break;
+        int channel = atoi(cmd_buffer + 1);
+        if (channel < 0) break;
+        new_channel = channel;
+        Serial.print("accepted new channel: ");
+        Serial.print(new_channel);
         Serial.println();
         break;
+      }
       case 'L': {
         Serial.print("found L: ");
-        if (bytes_read < 2) return;
+        if (bytes_read < 2) break;
         int length = atoi(cmd_buffer + 1);
-        if (length == 0) return;
+        if (length <= 0) break;
         new_buffer_size = length;
         Serial.print("accepted new length: ");
         Serial.print(new_buffer_size);
