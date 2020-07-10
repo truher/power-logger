@@ -26,10 +26,10 @@ const uint8_t pinLED = 13;
 // const uint32_t MAX_BUFFER_SIZE = 1600;
 // in samples, which is 16b not 8b
 static const uint32_t MAX_BUFFER_SIZE = 1000;
-uint32_t current_length = 1000;
+uint16_t current_length = 1000;
 uint32_t current_frequency = 5000;  // in hz
 uint32_t current_channel = 0;       // zero means "scan all"
-uint32_t new_length = 1000;         // for next round
+uint16_t new_length = 1000;         // for next round
 uint32_t new_frequency = 5000;      // in hz, for next round
 uint32_t new_channel = 0;
 DMAMEM static volatile uint16_t __attribute__((aligned(32)))
@@ -127,29 +127,41 @@ void dma_ch1_isr() {
   maybeRestart();
 }
 
-void set_length(uint32_t len) {
-  DMA_TCD0_CITER_ELINKNO = len;  // major loop size is buffer size (max 32k)
+void set_length(uint16_t len) {
+  Serial.print("SETTING LENGTH: ");
+  Serial.println(len);
+  
+  // major loop size is buffer size (max 32k)
+  DMA_TCD0_CITER_ELINKNO = len;
   DMA_TCD1_CITER_ELINKNO = len;
-
-  DMA_TCD0_DLASTSGA = -2 * len;  // after major loop, go back to the start
-  DMA_TCD1_DLASTSGA = -2 * len;
-
-  DMA_TCD0_BITER_ELINKNO = len;  // major loop size is buffer size (max 32k)
+  DMA_TCD0_BITER_ELINKNO = len;
   DMA_TCD1_BITER_ELINKNO = len;
+  
+  // after major loop, go back to the start
+  DMA_TCD0_DLASTSGA = -2 * len;  // promoted to int32_t
+  DMA_TCD1_DLASTSGA = -2 * len;
 }
 
 // TODO(truher): higher frequencies seem to corrupt the output.
 // TODO(truher): calibrate the actual frequency with the scope
 void set_frequency(uint32_t freq) {
-    // FTM0_MOD = 32;  // modulo, for the counter, output high on overflow
+  uint32_t new_mod = (SYSTEM_CLOCK_FREQUENCY / freq);
+  uint32_t new_half_mod = static_cast<uint32_t> (new_mod / 2);
+  new_mod &= 0xFFFF;
+  new_half_mod &= 0xFFFF;
+  Serial.print("SETTING MOD: ");
+  Serial.println(new_mod); 
+  Serial.print("SETTING HALF MOD: ");
+  Serial.println(new_half_mod); 
+  // FTM0_MOD = 32;  // modulo, for the counter, output high on overflow
   // FTM0_MOD = 16000;  // about 200 us, like the old one
   // FTM0_MOD = 16000;
-  FTM0_MOD = (int32_t) (SYSTEM_CLOCK_FREQUENCY / freq);
+  FTM0_MOD = new_mod;
 
   // FTM0_C0V = 16;  // match value, output low on match
   // FTM0_C0V = 8000;  // about 100 us
   // FTM0_C0V = 8000;
-  FTM0_C0V =  (int32_t) (SYSTEM_CLOCK_FREQUENCY / (2 * freq));
+  FTM0_C0V = new_half_mod;
 }
 
 
@@ -350,6 +362,7 @@ void loop() {
       if (bytes_read < 2) break;
       int length = atoi(cmd_buffer + 1);
       if (length <= 0) break;
+      if (length > 65535) break;
       new_length = length;
       Serial.print("accepted new length: ");
       Serial.print(new_length);
