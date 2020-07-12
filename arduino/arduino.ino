@@ -21,6 +21,8 @@ static const char alphabet[] = {
 };
 
 const uint8_t pinLED = 13;
+static const uint8_t PIN_ADC_COCO = 25;
+
 
 // 32767 but ideally divisible by 4 for b85... is that actually necessary?
 // const uint32_t MAX_BUFFER_SIZE = 1600;
@@ -41,7 +43,7 @@ static const uint32_t MAX_ENCODED_BUFFER_SIZE =
   static_cast<int>(MAX_BUFFER_SIZE * 2 * 5 / 4) + 1;
 char encoded_buf[MAX_ENCODED_BUFFER_SIZE];
 // this is teensy 3.5 default in hz
-static const uint32_t SYSTEM_CLOCK_FREQUENCY = 120000000;
+
 
 
 
@@ -117,26 +119,35 @@ void maybeRestart() {
   restartTimer();
 }
 
+// interrupt on DMA 0 buffer full
 void dma_ch0_isr() {
   DMA_CINT = DMA_CINT_CINT(0);  // clear the interrupt to avoid infinite loop
   maybeRestart();
 }
 
+// interrupt on DMA 0 buffer full
 void dma_ch1_isr() {
   DMA_CINT = DMA_CINT_CINT(1);
   maybeRestart();
 }
 
+// interrupt on ADC 0 conversion complete
+void adc0_isr() {
+  digitalWriteFast(PIN_ADC_COCO, HIGH);
+  delayMicroseconds(1);
+  digitalWriteFast(PIN_ADC_COCO, LOW);
+}
+
 void set_length(uint16_t len) {
   Serial.print("SETTING LENGTH: ");
   Serial.println(len);
-  
+
   // major loop size is buffer size (max 32k)
   DMA_TCD0_CITER_ELINKNO = len;
   DMA_TCD1_CITER_ELINKNO = len;
   DMA_TCD0_BITER_ELINKNO = len;
   DMA_TCD1_BITER_ELINKNO = len;
-  
+
   // after major loop, go back to the start
   DMA_TCD0_DLASTSGA = -2 * len;  // promoted to int32_t
   DMA_TCD1_DLASTSGA = -2 * len;
@@ -145,14 +156,21 @@ void set_length(uint16_t len) {
 // TODO(truher): higher frequencies seem to corrupt the output.
 // TODO(truher): calibrate the actual frequency with the scope
 void set_frequency(uint32_t freq) {
-  uint32_t new_mod = (SYSTEM_CLOCK_FREQUENCY / freq);
+  // the slowest possible is the highest possible mod (65535) of the highest
+  // possible prescale (128), of the 120Mhz clock, so that's about
+  // 14 hz.
+
+  uint32_t desired_mod = (F_BUS / freq);
+
+  uint32_t new_mod = (F_BUS / freq);
+
   uint32_t new_half_mod = static_cast<uint32_t> (new_mod / 2);
   new_mod &= 0xFFFF;
   new_half_mod &= 0xFFFF;
   Serial.print("SETTING MOD: ");
-  Serial.println(new_mod); 
+  Serial.println(new_mod);
   Serial.print("SETTING HALF MOD: ");
-  Serial.println(new_half_mod); 
+  Serial.println(new_half_mod);
   // FTM0_MOD = 32;  // modulo, for the counter, output high on overflow
   // FTM0_MOD = 16000;  // about 200 us, like the old one
   // FTM0_MOD = 16000;
@@ -162,6 +180,13 @@ void set_frequency(uint32_t freq) {
   // FTM0_C0V = 8000;  // about 100 us
   // FTM0_C0V = 8000;
   FTM0_C0V = new_half_mod;
+
+  FTM0_SC = FTM_SC_CLKS(1)   // set status: system clock
+              // no prescaling // TODO: use this for very slow freq?
+            | FTM_SC_PS(0);
+
+  // add this to enable overflow interrupts
+  // FTM0_SC |= FTM_SC_TOIE;
 }
 
 
@@ -172,6 +197,7 @@ void setup() {
     // do nothing
   }
   pinMode(pinLED, OUTPUT);
+  pinMode(PIN_ADC_COCO, OUTPUT);
 
   // FTM SETUP
 
@@ -187,12 +213,12 @@ void setup() {
 //  // FTM0_MOD = 32;  // modulo, for the counter, output high on overflow
 //  // FTM0_MOD = 16000;  // about 200 us, like the old one
 //  // FTM0_MOD = 16000;
-//  FTM0_MOD = (int32_t) (SYSTEM_CLOCK_FREQUENCY / current_frequency);
+//  FTM0_MOD = (int32_t) (F_BUS / current_frequency);
 //
 //  //FTM0_C0V = 16;  // match value, output low on match
 //  // FTM0_C0V = 8000;  // about 100 us
 //  // FTM0_C0V = 8000;
-//  FTM0_C0V =  (int32_t) (SYSTEM_CLOCK_FREQUENCY / (2 * current_frequency));
+//  FTM0_C0V =  (int32_t) (F_BUS / (2 * current_frequency));
 
   // this is so we can see the clock externally
   // bga pin b11 (row b, column 11) is port c1 ("PTC1")
@@ -201,10 +227,10 @@ void setup() {
              | PORT_PCR_DSE     // high drive strength
              | PORT_PCR_SRE;    // slow slew rate (?)
 
-  FTM0_SC = FTM_SC_CLKS(1)   // set status: system clock
-              // no prescaling // TODO: use this for very slow freq?
-            | FTM_SC_PS(0)
-            | FTM_SC_TOIE;   // enable overflow interrupts // TODO remove?
+//  FTM0_SC = FTM_SC_CLKS(1)   // set status: system clock
+//              // no prescaling // TODO: use this for very slow freq?
+//            | FTM_SC_PS(0);
+//            //| FTM_SC_TOIE;   // enable overflow interrupts // TODO remove?
 
   FTM0_EXTTRIG |= FTM_EXTTRIG_INITTRIGEN;  // FTM output trigger enable
   FTM0_MODE |= FTM_MODE_INIT;  // initialize the output
@@ -218,22 +244,27 @@ void setup() {
             | SIM_SOPT7_ADC0TRGSEL(8)  // select FTM0 trigger
             | SIM_SOPT7_ADC1TRGSEL(8);
 
-  ADC0_CFG1 |= ADC_CFG1_MODE(3);  // 16 bit
-  ADC1_CFG1 |= ADC_CFG1_MODE(3);
 
-  // TODO(truher): disable for slower speed?
-  ADC0_CFG2 |= ADC_CFG2_ADHSC    // high speed
-            |  ADC_CFG2_MUXSEL;  // select "b" channels
-  ADC1_CFG2 |= ADC_CFG2_ADHSC;
+  ADC0_CFG1 = ADC_CFG1_ADIV(2)     // divide by 4, so adck = 15mhz
+            | ADC_CFG1_MODE(1)     // 12 bit (13b differential)
+            | ADC_CFG1_ADICLK(0);  // bus clock (60mhz)
+  ADC1_CFG1 = ADC_CFG1_ADIV(2)
+            | ADC_CFG1_MODE(1)
+            | ADC_CFG1_ADICLK(0);
+
+  ADC0_CFG2 = ADC_CFG2_MUXSEL;  // select "b" channels
+  ADC1_CFG2 = 0;
+  // ADC_CFG2_ADHSC adds 2 cycles, for more accuracy
+  // ADC_CFG2_ADLSTS makes sample time much longer
 
   // TODO(truher): something about averageing (see SC3)
   // TODO(truher): something about calibration
 
   ADC0_SC2 |= ADC_SC2_ADTRG    // hardware trigger
-           | ADC_SC2_DMAEN;    // dma enable
+            | ADC_SC2_DMAEN;   // dma enable
 
   ADC1_SC2 |= ADC_SC2_ADTRG
-           | ADC_SC2_DMAEN;
+            | ADC_SC2_DMAEN;
 
   ADC0_SC1A = ADC_SC1_AIEN      // interrupt enable, TODO differential
             | ADC_SC1_ADCH(5);  // ADC0_SE5b, PTD1, D4, teensy "A0"
@@ -311,6 +342,9 @@ void setup() {
 
   NVIC_ENABLE_IRQ(IRQ_DMA_CH0);
   NVIC_ENABLE_IRQ(IRQ_DMA_CH1);
+
+  // ADC interrupt (to see it on the pin)
+  NVIC_ENABLE_IRQ(IRQ_ADC0);
 }
 
 
