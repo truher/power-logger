@@ -131,11 +131,16 @@ void dma_ch1_isr() {
   maybeRestart();
 }
 
-// interrupt on ADC 0 conversion complete
+// interrupt on conversion complete
 void adc0_isr() {
+ // int result = ADC0_RA; // TODO REMOVE
   digitalWriteFast(PIN_ADC_COCO, HIGH);
   delayMicroseconds(1);
   digitalWriteFast(PIN_ADC_COCO, LOW);
+}
+
+void adc1_isr() {
+ // int result = ADC1_RA;  // TODO REMOVE
 }
 
 void set_length(uint16_t len) {
@@ -157,8 +162,8 @@ void set_length(uint16_t len) {
 // TODO(truher): calibrate the actual frequency with the scope
 void set_frequency(uint32_t freq) {
   // the slowest possible is the highest possible mod (65535) of the highest
-  // possible prescale (128), of the 120Mhz clock, so that's about
-  // 14 hz.
+  // possible prescale (128), of the 60mhz clock, so that's about
+  // 7 hz.
 
   uint32_t desired_mod = (F_BUS / freq);
 
@@ -171,24 +176,67 @@ void set_frequency(uint32_t freq) {
   Serial.println(new_mod);
   Serial.print("SETTING HALF MOD: ");
   Serial.println(new_half_mod);
-  // FTM0_MOD = 32;  // modulo, for the counter, output high on overflow
-  // FTM0_MOD = 16000;  // about 200 us, like the old one
-  // FTM0_MOD = 16000;
+  // modulo, for the counter, output high on overflow
   FTM0_MOD = new_mod;
 
-  // FTM0_C0V = 16;  // match value, output low on match
-  // FTM0_C0V = 8000;  // about 100 us
-  // FTM0_C0V = 8000;
+  // match value, output low on match
   FTM0_C0V = new_half_mod;
 
-  FTM0_SC = FTM_SC_CLKS(1)   // set status: system clock
-              // no prescaling // TODO: use this for very slow freq?
-            | FTM_SC_PS(0);
-
-  // add this to enable overflow interrupts
-  // FTM0_SC |= FTM_SC_TOIE;
+  FTM0_SC = FTM_SC_CLKS(1)   // system clock
+            | FTM_SC_PS(0);  // no prescaling
+  //        | FTM_SC_TOIE;   // enable overflow interrupts
 }
 
+void calibrate_adc() {
+   /*
+  analog_init is called in pins_teensy.c, with some defaults.
+  TODO: calibrate the vref trim
+  VREF_TRM => chop enable (required).  trim level is set to the middle.
+  VREF_SC  => enable vref, regulator, compensation (all required), 'high power mode'
+  ADCx_CFG1 (fixed)
+  ADCx_CFG2 (fixed)
+  ADCx_SC2  (fixed)
+  ADCx_SC3  (fixed)
+  also the calibration is done wrong, so do it over again.
+  */
+  __disable_irq();
+  ADC0_SC3 = 0;   // stop any current calibration
+  ADC1_SC3 = 0;
+  ADC0_SC3 = ADC_SC3_CALF;  // clear failure
+  ADC1_SC3 = ADC_SC3_CALF;
+  ADC0_SC3 = ADC_SC3_CAL;  // start calibration
+  ADC1_SC3 = ADC_SC3_CAL;
+  __enable_irq();
+  while ((ADC0_SC3 & ADC_SC3_CAL) || (ADC1_SC3 & ADC_SC3_CAL)) {
+    // wait
+  }
+  if (ADC0_SC3 & ADC_SC3_CALF) {
+    Serial.println("ADC0 calibration failed!");
+  } else {
+    Serial.println("ADC0 calibration success!");
+  }
+  if (ADC1_SC3 & ADC_SC3_CALF) {
+    Serial.println("ADC1 calibration failed!");
+  } else {
+    Serial.println("ADC1 calibration success!");
+  }
+  // handle the calibration outputs (from wait_for_cal() which is static
+  __disable_irq();
+  uint16_t sum;
+  sum = ADC0_CLPS + ADC0_CLP4 + ADC0_CLP3 + ADC0_CLP2 + ADC0_CLP1 + ADC0_CLP0;
+  sum = (sum / 2) | 0x8000;
+  ADC0_PG = sum;
+  sum = ADC0_CLMS + ADC0_CLM4 + ADC0_CLM3 + ADC0_CLM2 + ADC0_CLM1 + ADC0_CLM0;
+  sum = (sum / 2) | 0x8000;
+  ADC0_MG = sum;
+  sum = ADC1_CLPS + ADC1_CLP4 + ADC1_CLP3 + ADC1_CLP2 + ADC1_CLP1 + ADC1_CLP0;
+  sum = (sum / 2) | 0x8000;
+  ADC1_PG = sum;
+  sum = ADC1_CLMS + ADC1_CLM4 + ADC1_CLM3 + ADC1_CLM2 + ADC1_CLM1 + ADC1_CLM0;
+  sum = (sum / 2) | 0x8000;
+  ADC1_MG = sum;
+  __enable_irq();
+}
 
 void setup() {
   snprintf(uidStr, sizeof(uidStr), "%08lX%08lX", SIM_UIDML, SIM_UIDL);
@@ -196,6 +244,8 @@ void setup() {
   while (!Serial) {
     // do nothing
   }
+  calibrate_adc();
+  
   pinMode(pinLED, OUTPUT);
   pinMode(PIN_ADC_COCO, OUTPUT);
 
@@ -210,16 +260,6 @@ void setup() {
 
   set_frequency(current_frequency);
 
-//  // FTM0_MOD = 32;  // modulo, for the counter, output high on overflow
-//  // FTM0_MOD = 16000;  // about 200 us, like the old one
-//  // FTM0_MOD = 16000;
-//  FTM0_MOD = (int32_t) (F_BUS / current_frequency);
-//
-//  //FTM0_C0V = 16;  // match value, output low on match
-//  // FTM0_C0V = 8000;  // about 100 us
-//  // FTM0_C0V = 8000;
-//  FTM0_C0V =  (int32_t) (F_BUS / (2 * current_frequency));
-
   // this is so we can see the clock externally
   // bga pin b11 (row b, column 11) is port c1 ("PTC1")
   // which is teensy pin 22 or a8
@@ -227,49 +267,54 @@ void setup() {
              | PORT_PCR_DSE     // high drive strength
              | PORT_PCR_SRE;    // slow slew rate (?)
 
-//  FTM0_SC = FTM_SC_CLKS(1)   // set status: system clock
-//              // no prescaling // TODO: use this for very slow freq?
-//            | FTM_SC_PS(0);
-//            //| FTM_SC_TOIE;   // enable overflow interrupts // TODO remove?
-
   FTM0_EXTTRIG |= FTM_EXTTRIG_INITTRIGEN;  // FTM output trigger enable
   FTM0_MODE |= FTM_MODE_INIT;  // initialize the output
 
   FTM0_OUTMASK = 0xFE;         // enable only FTM0_CH0
 
   // ADC SETUP
+  
+  // TODO(truher): something about averaging (see SC3)
+  // TODO(truher): something about calibration
 
   SIM_SOPT7 = SIM_SOPT7_ADC0ALTTRGEN   // enable alternate trigger
             | SIM_SOPT7_ADC1ALTTRGEN
             | SIM_SOPT7_ADC0TRGSEL(8)  // select FTM0 trigger
             | SIM_SOPT7_ADC1TRGSEL(8);
 
+  //          ADC_SC1_DIFF      // differential mode
+  ADC0_SC1A = ADC_SC1_AIEN      // interrupt enable, TODO differential
+            | ADC_SC1_ADCH(5);  // ADC0_SE5b, PTD1, D4, teensy "A0"
+  ADC1_SC1A = ADC_SC1_AIEN
+            | ADC_SC1_ADCH(8);  // ADCx_SE8, PTB0, H10, teensy "A2"
 
-  ADC0_CFG1 = ADC_CFG1_ADIV(2)     // divide by 4, so adck = 15mhz
+  //          ADC_CFG1_ADLPC       // 0 => normal power configuration
+  //        | ADC_CFG1_ADLSMP      // 0 = short sample time, 1 = extra sample time
+  ADC0_CFG1 = ADC_CFG1_ADIV(2)     // 2 => divide by 4, so adck = 15mhz
             | ADC_CFG1_MODE(1)     // 12 bit (13b differential)
             | ADC_CFG1_ADICLK(0);  // bus clock (60mhz)
   ADC1_CFG1 = ADC_CFG1_ADIV(2)
             | ADC_CFG1_MODE(1)
             | ADC_CFG1_ADICLK(0);
+            
+  //          ADC_CFG2_ADACKEN     // 0 => async clock disabled
+  //          ADC_CFG2_ADHSC       // 0 => normal conversion speed
+  //          ADC_CFG2_ADLSTS(2);  // extra sample time, only with ADLSMP
+  ADC0_CFG2 = ADC_CFG2_MUXSEL;      // select "b" channels
+  ADC1_CFG2 = 0;                    // select "a" channels
 
-  ADC0_CFG2 = ADC_CFG2_MUXSEL;  // select "b" channels
-  ADC1_CFG2 = 0;
-  // ADC_CFG2_ADHSC adds 2 cycles, for more accuracy
-  // ADC_CFG2_ADLSTS makes sample time much longer
+  //         ADC_SC2_REFSEL   // 0 = Vrefh and Vrefl.
+  ADC0_SC2 = ADC_SC2_ADTRG    // hardware trigger
+           | ADC_SC2_DMAEN;   // dma enable
+  ADC1_SC2 = ADC_SC2_ADTRG
+           | ADC_SC2_DMAEN;
 
-  // TODO(truher): something about averageing (see SC3)
-  // TODO(truher): something about calibration
-
-  ADC0_SC2 |= ADC_SC2_ADTRG    // hardware trigger
-            | ADC_SC2_DMAEN;   // dma enable
-
-  ADC1_SC2 |= ADC_SC2_ADTRG
-            | ADC_SC2_DMAEN;
-
-  ADC0_SC1A = ADC_SC1_AIEN      // interrupt enable, TODO differential
-            | ADC_SC1_ADCH(5);  // ADC0_SE5b, PTD1, D4, teensy "A0"
-  ADC1_SC1A = ADC_SC1_AIEN
-            | ADC_SC1_ADCH(8);  // ADCx_SE8, PTB0, H10, teensy "A2"
+  //         ADC_SC3_CAL      // start calibration
+  //         ADC_SC3_ADCO     // continuous conversion
+  //         ADC_SC3_AVGE     // enable averaging
+  //         ADC_SC3_AVGS(0)  // 0 => 4 samples
+  ADC0_SC3 = 0;  // one-shot, no averaging
+  ADC1_SC3 = 0;
 
   SIM_SCGC6 |= SIM_SCGC6_FTM0   // ftm0 clock gate
             |  SIM_SCGC6_ADC0;  // adc0 clock gate
@@ -345,6 +390,7 @@ void setup() {
 
   // ADC interrupt (to see it on the pin)
   NVIC_ENABLE_IRQ(IRQ_ADC0);
+  NVIC_ENABLE_IRQ(IRQ_ADC1);
 }
 
 
