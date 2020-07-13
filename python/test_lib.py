@@ -1,6 +1,5 @@
 """Test the library."""
 from __future__ import annotations
-from typing import List
 import base64
 import unittest
 import numpy as np
@@ -36,7 +35,7 @@ class TestLib(unittest.TestCase):
 
     def test_update_stats(self) -> None:
         """Tests stats calculations."""
-        x_in: np.ndarray[np.float64] = np.array([1, 2, 3, 4, 5]).astype(np.float64)
+        x_in: np.ndarray[np.float64] = np.array([1, 2, 3, 4, 5]).astype(np.float64) # pylint: disable=E1136
         sums = lib.Sums()
         lib.update_stats(x_in, sums)
         self.assertEqual(5, sums.count)

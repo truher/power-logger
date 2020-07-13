@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<title>Config</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=">
+<link rel="stylesheet" href="/static/common.css">
+
+<form>
+  <label for="C">Channel (current {{conf.channel}}):</label><br>
+  <input type="text" id="C" name="C" value="{{args.C}}"><br>
+  <label for="F">Frequency in Hz (current {{conf.frequency}}):</label><br>
+  <input type="text" id="F" name="F" value="{{args.F}}"><br>
+  <label for="L">Length (current {{conf.length}}):</label><br>
+  <input type="text" id="L" name="L" value="{{args.L}}"><br><br>
+  <input type="submit" value="Submit">
+</form>

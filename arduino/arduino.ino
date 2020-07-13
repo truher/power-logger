@@ -81,18 +81,7 @@ void restartTimer() {
 int ct = 0;
 uint32_t encoded_len = 0;
 
-// if neither channel is done, we shouldn't be here.
-// if one channel is done, let the other finish, it won't hurt anything.
-// if both channels are done, then set up a new run.
-void maybeRestart() {
-  if (DMA_ERQ & DMA_ERQ_ERQ0) return;  // channel 0 still enabled
-  if (DMA_ERQ & DMA_ERQ_ERQ1) return;  // channel 1 still enabled
-
-  // turn off the timer
-  FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(0);
-
-  digitalWriteFast(pinLED, HIGH);
-
+void WriteOutput() {
   Serial.print(uidStr);
   Serial.print("\tct");
   Serial.print(ct);         // TODO(truher): real ct channels and names
@@ -110,6 +99,21 @@ void maybeRestart() {
   Serial.write(encoded_buf, encoded_len);  // TODO(truher): this is amps
   Serial.println();
   Serial.send_now();
+}
+
+// if neither channel is done, we shouldn't be here.
+// if one channel is done, let the other finish, it won't hurt anything.
+// if both channels are done, then set up a new run.
+void maybeRestart() {
+  if (DMA_ERQ & DMA_ERQ_ERQ0) return;  // channel 0 still enabled
+  if (DMA_ERQ & DMA_ERQ_ERQ1) return;  // channel 1 still enabled
+
+  // turn off the timer
+  FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(0);
+
+  digitalWriteFast(pinLED, HIGH);
+
+  WriteOutput();
 
   // TODO(truher): reconfigure ADC channels etc
 
@@ -133,20 +137,17 @@ void dma_ch1_isr() {
 
 // interrupt on conversion complete
 void adc0_isr() {
- // int result = ADC0_RA; // TODO REMOVE
+  // int result = ADC0_RA; // TODO REMOVE
   digitalWriteFast(PIN_ADC_COCO, HIGH);
   delayMicroseconds(1);
   digitalWriteFast(PIN_ADC_COCO, LOW);
 }
 
 void adc1_isr() {
- // int result = ADC1_RA;  // TODO REMOVE
+  // int result = ADC1_RA;  // TODO REMOVE
 }
 
 void set_length(uint16_t len) {
-  Serial.print("SETTING LENGTH: ");
-  Serial.println(len);
-
   // major loop size is buffer size (max 32k)
   DMA_TCD0_CITER_ELINKNO = len;
   DMA_TCD1_CITER_ELINKNO = len;
@@ -172,10 +173,6 @@ void set_frequency(uint32_t freq) {
   uint32_t new_half_mod = static_cast<uint32_t> (new_mod / 2);
   new_mod &= 0xFFFF;
   new_half_mod &= 0xFFFF;
-  Serial.print("SETTING MOD: ");
-  Serial.println(new_mod);
-  Serial.print("SETTING HALF MOD: ");
-  Serial.println(new_half_mod);
   // modulo, for the counter, output high on overflow
   FTM0_MOD = new_mod;
 
@@ -245,7 +242,7 @@ void setup() {
     // do nothing
   }
   calibrate_adc();
-  
+
   pinMode(pinLED, OUTPUT);
   pinMode(PIN_ADC_COCO, OUTPUT);
 
@@ -273,7 +270,7 @@ void setup() {
   FTM0_OUTMASK = 0xFE;         // enable only FTM0_CH0
 
   // ADC SETUP
-  
+
   // TODO(truher): something about averaging (see SC3)
   // TODO(truher): something about calibration
 
@@ -289,14 +286,14 @@ void setup() {
             | ADC_SC1_ADCH(8);  // ADCx_SE8, PTB0, H10, teensy "A2"
 
   //          ADC_CFG1_ADLPC       // 0 => normal power configuration
-  //        | ADC_CFG1_ADLSMP      // 0 = short sample time, 1 = extra sample time
+  //        | ADC_CFG1_ADLSMP      // 0 = short sample time, 1 = extra time
   ADC0_CFG1 = ADC_CFG1_ADIV(2)     // 2 => divide by 4, so adck = 15mhz
             | ADC_CFG1_MODE(1)     // 12 bit (13b differential)
             | ADC_CFG1_ADICLK(0);  // bus clock (60mhz)
   ADC1_CFG1 = ADC_CFG1_ADIV(2)
             | ADC_CFG1_MODE(1)
             | ADC_CFG1_ADICLK(0);
-            
+
   //          ADC_CFG2_ADACKEN     // 0 => async clock disabled
   //          ADC_CFG2_ADHSC       // 0 => normal conversion speed
   //          ADC_CFG2_ADLSTS(2);  // extra sample time, only with ADLSMP

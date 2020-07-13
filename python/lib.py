@@ -166,10 +166,19 @@ def make_hourly(raw_data: pd.DataFrame) -> pd.DataFrame:
                               loffset='-1H').max().diff().dropna().iloc[1:]
     return hourly #type:ignore
 
+@dataclass
+class Conf:
+    """configuration state of the arduino"""
+    channel: int = 0
+    frequency: int = 0
+    length: int = 0
+
 # TODO: add power here
 class VA(NamedTuple):
     """one named observation of volts and amps series"""
     load: str
+    frequency: int
+    length: int
     volts: np.ndarray[np.float64] # pylint: disable=E1136  # pylint/issues/3139
     amps: np.ndarray[np.float64] # pylint: disable=E1136  # pylint/issues/3139
 
@@ -225,9 +234,10 @@ def no_serial(serials: List[ReaderThread]) -> Callable[[str], bool]:
         return True
     return f_no_serial
 
-# refresh the serials list with ttys
+# refresh the serials list (in place) with ttys
 def refresh_serials(serials: List[ReaderThread],
-                    queue_writer_factory: Callable[[], QueueLine]) -> List[ReaderThread]:
+                    queue_writer_factory: Callable[[], QueueLine]) -> None:
+                    #queue_writer_factory: Callable[[], QueueLine]) -> List[ReaderThread]:
     """Checks for new ttys and dead serials, return a good list."""
 
     # list of the ttys that exist
@@ -236,7 +246,7 @@ def refresh_serials(serials: List[ReaderThread],
     # keep the list of serial ports that are open and that match a tty
     # TODO: replace is_open with the threaded connection_lost method?
     # TODO: dispose of the broken ones somehow?
-    serials = [*filter(lambda x: is_open(x) and has_tty(ttys)(x), serials)]
+    serials[:] = [*filter(lambda x: is_open(x) and has_tty(ttys)(x), serials)]
 
     # create new serials for ttys without serials
     ttys_needing_serials = filter(no_serial(serials), ttys)
@@ -244,7 +254,7 @@ def refresh_serials(serials: List[ReaderThread],
     for tty in ttys_needing_serials:
         serials.append(new_serial(tty, queue_writer_factory))
 
-    return serials
+    #return serials
 
 # interpret one row
 def bytes_to_array(all_fields: List[bytes],
@@ -377,7 +387,7 @@ def zero_samples(samples: VA) -> VA:
         samples.volts - np.mean(samples.volts))
     amps: np.ndarray[np.float64] = ( # pylint: disable=E1136  # pylint/issues/3139
         samples.amps - np.mean(samples.amps))
-    return VA(samples.load, volts, amps)
+    return VA(samples.load, samples.frequency, samples.length, volts, amps)
 
 def scale_samples(samples: VA) -> VA:
     """Transforms zeroed samples to measures"""
@@ -387,7 +397,7 @@ def scale_samples(samples: VA) -> VA:
         samples.volts * ACTUAL_RMS_VOLTS / scale_vrms)
     amps: np.ndarray[np.float64] = ( # pylint: disable=E1136  # pylint/issues/3139
         samples.amps * ACTUAL_RMS_AMPS / scale_arms)
-    return VA(samples.load, volts, amps)
+    return VA(samples.load, samples.frequency, samples.length, volts, amps)
 
 # date uid ct len b1 b2
 def decode_and_interpolate(loadnames: Dict[bytes, str],
@@ -424,7 +434,10 @@ def decode_and_interpolate(loadnames: Dict[bytes, str],
     if amp_samples is None:
         return None # skip uninterpretable rows
 
-    return VA(load_name_s, volt_samples, amp_samples)
+    frequency = int(fields[3])
+    length = int(fields[4])
+
+    return VA(load_name_s, frequency, length, volt_samples, amp_samples)
 
 # TODO: add the multiply to VA
 def average_power_watts(volts: np.ndarray[np.float64], # pylint: disable=E1136  # pylint/issues/3139

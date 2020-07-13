@@ -11,7 +11,7 @@ import warnings
 from datetime import datetime
 from typing import Any, Optional
 from serial.threaded import ReaderThread #type:ignore
-from flask import Flask, Response
+from flask import render_template, request, Flask, Response
 from waitress import serve #type:ignore
 import numpy as np
 from config import loadnames
@@ -21,6 +21,9 @@ SAMPLE_DATA_FILENAME = 'data_sample.csv'
 RAW_DATA_FILENAME = 'data_raw.csv'
 HOURLY_DATA_FILENAME = 'data_hourly.csv'
 
+# there's no default here, the default is in the arduino code
+current_config = lib.Conf()
+
 app = Flask(__name__)
 rng = np.random.default_rng() #type:ignore
 
@@ -29,14 +32,14 @@ raw_queue: queue.SimpleQueue[bytes] = queue.SimpleQueue()
 randx = rng.integers(1023, size=100)
 randy = rng.integers(1023, size=100)
 
-latest_va = {'load1': lib.VA('load1', randx, randy),
-             'load2': lib.VA('load2', randx, randy),
-             'load3': lib.VA('load3', randx, randy),
-             'load4': lib.VA('load4', randx, randy),
-             'load5': lib.VA('load5', randx, randy),
-             'load6': lib.VA('load6', randx, randy),
-             'load7': lib.VA('load7', randx, randy),
-             'load8': lib.VA('load8', randx, randy),}
+latest_va = {'load1': lib.VA('load1', 5000, 1000, randx, randy),
+             'load2': lib.VA('load2', 5000, 1000, randx, randy),
+             'load3': lib.VA('load3', 5000, 1000, randx, randy),
+             'load4': lib.VA('load4', 5000, 1000, randx, randy),
+             'load5': lib.VA('load5', 5000, 1000, randx, randy),
+             'load6': lib.VA('load6', 5000, 1000, randx, randy),
+             'load7': lib.VA('load7', 5000, 1000, randx, randy),
+             'load8': lib.VA('load8', 5000, 1000, randx, randy),}
 
 def va_updater(volts_amps: lib.VA) -> None:
     """Callback for updating VA"""
@@ -59,6 +62,7 @@ def make_sample_line(now_s: str, samples: lib.VA) -> str:
 
 def make_real_old_format_line(now_s: str, volts_amps: lib.VA) -> str:
     """old format is for the raw data file"""
+    # TODO: include length and freq here
     pwr: float = lib.average_power_watts(volts_amps.volts, volts_amps.amps)
     vrms: float = lib.rms(volts_amps.volts)
     arms: float = lib.rms(volts_amps.amps)
@@ -93,6 +97,9 @@ def data_writer() -> None:
                     if not samples:
                         continue
 
+                    current_config.frequency = samples.frequency
+                    current_config.length = samples.length
+
                     sample_line = make_sample_line(now_s, samples)
                     sample_sink.write(sample_line.encode('ascii'))
                     sample_sink.write(b'\n')
@@ -119,13 +126,15 @@ def queue_writer_factory() -> lib.QueueLine:
     """Produce a QueueLine instance."""
     return lib.QueueLine(raw_queue)
 
+serials: ReaderThread = []
 def data_reader() -> None:
     """Continuously reads serial inputs, writes to queue."""
-    serials: ReaderThread = []
     while True:
         try:
             # TODO: catch lost connections, and use notify to catch new ttys
-            serials = lib.refresh_serials(serials, queue_writer_factory)
+            #global serials
+            #serials = lib.refresh_serials(serials, queue_writer_factory)
+            lib.refresh_serials(serials, queue_writer_factory)
             time.sleep(10)
         except: # pylint: disable=bare-except
             traceback.print_exc(file=sys.stderr)
@@ -178,6 +187,28 @@ def logger() -> Any:
     print('logger')
     return app.send_static_file('logger.html')
 
+@app.route('/config')
+def config() -> Any:
+    """config"""
+    arg_c = request.args.get('C')
+    arg_f = request.args.get('F')
+    arg_l = request.args.get('L')
+    print(f'config C{arg_c} F{arg_f} L{arg_l}')
+    for ser in serials:
+        if arg_c is not None:
+            ser.write(b'C')
+            ser.write(str(arg_c).encode('ascii'))
+            ser.write(b'\r')
+        if arg_f is not None:
+            ser.write(b'F')
+            ser.write(str(arg_f).encode('ascii'))
+            ser.write(b'\r')
+        if arg_l is not None:
+            ser.write(b'L')
+            ser.write(str(arg_l).encode('ascii'))
+            ser.write(b'\r')
+    return render_template('config.html', conf=current_config, args=request.args)
+
 @app.route('/timeseries')
 def timeseries() -> Any:
     """timeseries"""
@@ -223,6 +254,8 @@ def data() -> Any:
     """data"""
     print('data')
     loadlist = [{'load': va.load,
+                 'frequency': va.frequency,
+                 'length': va.length,
                  'volts': va.volts.tolist(),
                  'amps': va.amps.tolist()}
                 for va in latest_va.values()]

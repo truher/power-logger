@@ -3,8 +3,13 @@ const container = document.querySelector('#small-multiples');
 let allloads = {};
 
 d3.select(container).on('draw', () => {
+console.log("draw");
   d3.json('/data').then(function(data) {
+    timeout_ms = 0;
     data.map(function(row) {
+      if (row.frequency > 0 && row.length > 0) {
+        timeout_ms += 1000 * row.length / row.frequency;
+      }
       zdz = d3.zip(row.volts, row.amps).map(function(d) {
         return {
           volts: d[0],
@@ -58,12 +63,10 @@ d3.select(container).on('draw', () => {
           });
           return update;
         });
+    setTimeout(() => {
+      container.requestRedraw();
+    }, timeout_ms);
   });
 });
 
 container.requestRedraw();
-
-setInterval(() => {
-  container.requestRedraw();
-}, 500);
-
