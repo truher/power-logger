@@ -5,6 +5,35 @@
 // see ADC_Module.cpp
 // see DMAChannel.cpp
 
+
+struct ct {
+  enum adc {ADC0, ADC1};
+  enum muxsel {A, B};
+  
+  adc amps_adc;
+  int amps_adch;   // channel for amps
+  muxsel amps_muxsel;
+  int volts_adch;  // channel for volts
+  muxsel volts_muxsel;
+} cts[] = {
+  {ADC0,  5, B}, // ct1 ADC0_SE5b "A0"
+  {ADC0, 14, A}, // ct2 ADC0_SE14 "A1"
+  {ADC0,  9, A}, // ct3 ADC0_SE9 "A3"
+  {ADC0, 13, A}, // ct4 ADC0_SE13 "A4"
+  {ADC0, 12, A}, // ct5 ADC0_SE12 "A5"
+  {ADC0,  6, B}, // ct6 ADC0_SE6b "A6"
+  {ADC0,  4, B}, // ct7 ADC0_SE4b "A9"
+  {ADC0, 17, A}, // ct8 ADC0_SE17 "A14"
+  {ADC1,  8, A}, // ct9 ADC1_SE8 "A2"
+  {ADC1, 14, A}, // ct10 ADC1_SE14 "A12"
+  {ADC1, 15, A}, // ct11 ADC1_SE15 "A13"
+  {ADC1,  4, B}, // ct12 ADC1_SE4b "A16"
+  {ADC1,  5, B}, // ct13 ADC1_SE5b "A17"
+  {ADC1,  6, B}, // ct14 ADC1_SE6b "A18"
+  {ADC1,  7, B}, // ct15 ADC1_SE7b "A19"
+  {ADC1, 17, A}, // ct16 ADC1_SE17 "A20"
+};
+
 char uidStr[17] = {0};  // the lower 2 bytes of the UID
 
 static const char alphabet[] = {
@@ -235,6 +264,14 @@ void calibrate_adc() {
   __enable_irq();
 }
 
+void set_channel() {
+  //          ADC_SC1_DIFF      // differential mode
+  ADC0_SC1A = ADC_SC1_AIEN      // interrupt enable, TODO differential
+            | ADC_SC1_ADCH(5);  // ADC0_SE5b, PTD1, D4, teensy "A0"
+  ADC1_SC1A = ADC_SC1_AIEN
+            | ADC_SC1_ADCH(8);  // ADCx_SE8, PTB0, H10, teensy "A2"
+}
+
 void setup() {
   snprintf(uidStr, sizeof(uidStr), "%08lX%08lX", SIM_UIDML, SIM_UIDL);
   Serial.begin(0);
@@ -279,11 +316,13 @@ void setup() {
             | SIM_SOPT7_ADC0TRGSEL(8)  // select FTM0 trigger
             | SIM_SOPT7_ADC1TRGSEL(8);
 
-  //          ADC_SC1_DIFF      // differential mode
-  ADC0_SC1A = ADC_SC1_AIEN      // interrupt enable, TODO differential
-            | ADC_SC1_ADCH(5);  // ADC0_SE5b, PTD1, D4, teensy "A0"
-  ADC1_SC1A = ADC_SC1_AIEN
-            | ADC_SC1_ADCH(8);  // ADCx_SE8, PTB0, H10, teensy "A2"
+  set_channel();
+  
+//  //          ADC_SC1_DIFF      // differential mode
+//  ADC0_SC1A = ADC_SC1_AIEN      // interrupt enable, TODO differential
+//            | ADC_SC1_ADCH(5);  // ADC0_SE5b, PTD1, D4, teensy "A0"
+//  ADC1_SC1A = ADC_SC1_AIEN
+//            | ADC_SC1_ADCH(8);  // ADC1_SE8, PTB0, H10, teensy "A2"
 
   //          ADC_CFG1_ADLPC       // 0 => normal power configuration
   //        | ADC_CFG1_ADLSMP      // 0 = short sample time, 1 = extra time
