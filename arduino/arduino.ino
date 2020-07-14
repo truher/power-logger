@@ -9,29 +9,34 @@
 struct ct {
   enum adc {ADC0, ADC1};
   enum muxsel {A, B};
+  enum diff {D, SE};
   
   adc amps_adc;
   int amps_adch;   // channel for amps
   muxsel amps_muxsel;
   int volts_adch;  // channel for volts
   muxsel volts_muxsel;
+  diff volts_diff;
 } cts[] = {
-  {ADC0,  5, B}, // ct1 ADC0_SE5b "A0"
-  {ADC0, 14, A}, // ct2 ADC0_SE14 "A1"
-  {ADC0,  9, A}, // ct3 ADC0_SE9 "A3"
-  {ADC0, 13, A}, // ct4 ADC0_SE13 "A4"
-  {ADC0, 12, A}, // ct5 ADC0_SE12 "A5"
-  {ADC0,  6, B}, // ct6 ADC0_SE6b "A6"
-  {ADC0,  4, B}, // ct7 ADC0_SE4b "A9"
-  {ADC0, 17, A}, // ct8 ADC0_SE17 "A14"
-  {ADC1,  8, A}, // ct9 ADC1_SE8 "A2"
-  {ADC1, 14, A}, // ct10 ADC1_SE14 "A12"
-  {ADC1, 15, A}, // ct11 ADC1_SE15 "A13"
-  {ADC1,  4, B}, // ct12 ADC1_SE4b "A16"
-  {ADC1,  5, B}, // ct13 ADC1_SE5b "A17"
-  {ADC1,  6, B}, // ct14 ADC1_SE6b "A18"
-  {ADC1,  7, B}, // ct15 ADC1_SE7b "A19"
-  {ADC1, 17, A}, // ct16 ADC1_SE17 "A20"
+  // 240v ADC1_DP0 and ADC1_DM0
+  {ADC0,  5, B, 0, A, D},   // ct1  ADC0_SE5b  "A0"
+  {ADC0, 14, A, 0, A, D},   // ct2  ADC0_SE14  "A1"
+  {ADC0,  9, A, 0, A, D},   // ct3  ADC0_SE9   "A3"
+  {ADC0, 13, A, 0, A, D},   // ct4  ADC0_SE13  "A4"
+  {ADC0, 12, A, 0, A, D},   // ct5  ADC0_SE12  "A5"
+  {ADC0,  6, B, 0, A, D},   // ct6  ADC0_SE6b  "A6"
+  {ADC0,  4, B, 0, A, D},   // ct7  ADC0_SE4b  "A9"
+  {ADC0, 17, A, 0, A, D},   // ct8  ADC0_SE17 "A14"
+  // 120v L1 ADC0_SE7b
+  {ADC1,  8, A, 7, B, SE},  // ct9  ADC1_SE8   "A2"
+  {ADC1, 14, A, 7, B, SE},  // ct10 ADC1_SE14 "A12"
+  {ADC1, 15, A, 7, B, SE},  // ct11 ADC1_SE15 "A13"
+  {ADC1,  4, B, 7, B, SE},  // ct12 ADC1_SE4b "A16"
+  // 120v L2 ADC0_SE15
+  {ADC1,  5, B, 15, A, SE}, // ct13 ADC1_SE5b "A17"
+  {ADC1,  6, B, 15, A, SE}, // ct14 ADC1_SE6b "A18"
+  {ADC1,  7, B, 15, A, SE}, // ct15 ADC1_SE7b "A19"
+  {ADC1, 17, A, 15, A, SE}, // ct16 ADC1_SE17 "A20"
 };
 
 char uidStr[17] = {0};  // the lower 2 bytes of the UID
