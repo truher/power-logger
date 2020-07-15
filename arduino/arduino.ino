@@ -107,7 +107,8 @@ void restartTimer() {
   DMA_SERQ = 0;  // enable DMA channel 0
   DMA_SERQ = 1;  // enable DMA channel 1
   // turn the timer back on
-  FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(1);
+  // FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(1);
+  FTM1_SC = (FTM1_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(1);
 }
 
 uint32_t encoded_len = 0;
@@ -140,7 +141,8 @@ void maybeRestart() {
   if (DMA_ERQ & DMA_ERQ_ERQ1) return;  // channel 1 still enabled
 
   // turn off the timer
-  FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(0);
+  // FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(0);
+  FTM1_SC = (FTM1_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(0);
 
   digitalWriteFast(pinLED, HIGH);
 
@@ -202,12 +204,15 @@ void set_frequency(uint32_t freq) {
   new_mod &= 0xFFFF;
   new_half_mod &= 0xFFFF;
   // modulo, for the counter, output high on overflow
-  FTM0_MOD = new_mod;
-
+  // FTM0_MOD = new_mod;
+  FTM1_MOD = new_mod;
+  
   // match value, output low on match
-  FTM0_C0V = new_half_mod;
+  // FTM0_C0V = new_half_mod;
+  FTM1_C0V = new_half_mod;
 
-  FTM0_SC = FTM_SC_CLKS(1)   // system clock
+  // FTM0_SC = FTM_SC_CLKS(1)   // system clock
+  FTM1_SC = FTM_SC_CLKS(1)   // system clock
             | FTM_SC_PS(0);  // no prescaling
   //        | FTM_SC_TOIE;   // enable overflow interrupts
 }
@@ -295,26 +300,43 @@ void setup() {
 
   // FTM SETUP
 
-  FTM0_POL = 0;
-  FTM0_OUTMASK = 0xFF;  // mask all
-  FTM0_SC = 0x00;       // reset status == turn off FTM
-  FTM0_CNT = 0x00;      // zero the counter, or maybe this does nothing
-  FTM0_CNTIN = 0;       // counter initial value
-  FTM0_C0SC = FTM_CSC_ELSB | FTM_CSC_MSB;  // output compare, high-true
+  // FTM0_POL = 0;
+  FTM1_POL = 0;
+  // FTM0_OUTMASK = 0xFF;  // mask all
+  FTM1_OUTMASK = 0xFF;  // mask all
+  // FTM0_SC = 0x00;       // reset status == turn off FTM
+  FTM1_SC = 0x00;       // reset status == turn off FTM
+  // FTM0_CNT = 0x00;      // zero the counter, or maybe this does nothing
+  FTM1_CNT = 0x00;      // zero the counter, or maybe this does nothing
+  // FTM0_CNTIN = 0;       // counter initial value
+  FTM1_CNTIN = 0;       // counter initial value
+  // FTM0_C0SC = FTM_CSC_ELSB | FTM_CSC_MSB;  // output compare, high-true
+  FTM1_C0SC = FTM_CSC_ELSB | FTM_CSC_MSB;  // output compare, high-true
 
   set_frequency(current_frequency);
 
   // this is so we can see the clock externally
   // bga pin b11 (row b, column 11) is port c1 ("PTC1")
   // which is teensy pin 22 or a8
-  PORTC_PCR1 = PORT_PCR_MUX(4)  // in alternative 4, ftm0_ch0 goes to b11
-             | PORT_PCR_DSE     // high drive strength
-             | PORT_PCR_SRE;    // slow slew rate (?)
+  
+  // move this to another pin.
 
-  FTM0_EXTTRIG |= FTM_EXTTRIG_INITTRIGEN;  // FTM output trigger enable
-  FTM0_MODE |= FTM_MODE_INIT;  // initialize the output
+  //PORTC_PCR1 = PORT_PCR_MUX(4)  // in alternative 4, ftm0_ch0 goes to b11
+  //           | PORT_PCR_DSE     // high drive strength
+  //           | PORT_PCR_SRE;    // slow slew rate (?)
 
-  FTM0_OUTMASK = 0xFE;         // enable only FTM0_CH0
+  // Ftm1_ch0 k9 alt 3 PTA12 = “3”
+  PORTA_PCR12 = PORT_PCR_MUX(3)  // ftm1_ch0 goes to K9 in alternative 3
+               | PORT_PCR_DSE
+               | PORT_PCR_SRE;
+
+  //FTM0_EXTTRIG |= FTM_EXTTRIG_INITTRIGEN;  // FTM output trigger enable
+  FTM1_EXTTRIG |= FTM_EXTTRIG_INITTRIGEN;  // FTM output trigger enable
+  //FTM0_MODE |= FTM_MODE_INIT;  // initialize the output
+  FTM1_MODE |= FTM_MODE_INIT;  // initialize the output
+
+  //FTM0_OUTMASK = 0xFE;         // enable only CH0
+  FTM1_OUTMASK = 0xFE;         // enable only CH0
 
   // ADC SETUP
 
@@ -323,8 +345,10 @@ void setup() {
 
   SIM_SOPT7 = SIM_SOPT7_ADC0ALTTRGEN   // enable alternate trigger
             | SIM_SOPT7_ADC1ALTTRGEN
-            | SIM_SOPT7_ADC0TRGSEL(8)  // select FTM0 trigger
-            | SIM_SOPT7_ADC1TRGSEL(8);
+  //          | SIM_SOPT7_ADC0TRGSEL(8)  // select FTM0 trigger
+  //          | SIM_SOPT7_ADC1TRGSEL(8);
+            | SIM_SOPT7_ADC0TRGSEL(9)  // select FTM1 trigger
+            | SIM_SOPT7_ADC1TRGSEL(9);
 
   set_ct(current_ct);
 
@@ -350,7 +374,8 @@ void setup() {
   ADC0_SC3 = 0;  // one-shot, no averaging
   ADC1_SC3 = 0;
 
-  SIM_SCGC6 |= SIM_SCGC6_FTM0   // ftm0 clock gate
+  // SIM_SCGC6 |= SIM_SCGC6_FTM0   // ftm0 clock gate
+  SIM_SCGC6 |= SIM_SCGC6_FTM1   // ftm1 clock gate
             |  SIM_SCGC6_ADC0;  // adc0 clock gate
   SIM_SCGC3 |= SIM_SCGC3_ADC1;  // adc1 clock gate
 
