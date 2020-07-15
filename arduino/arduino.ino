@@ -1,43 +1,37 @@
 // Copyright 2020 truher
 // Teensy 3.5 two-channel synchronized ADC
-//
-// see EEOL_2014APR24_AMP_CTRL_AN_01.pdf
-// see ADC_Module.cpp
-// see DMAChannel.cpp
 
+struct adcx {
+  uint8_t ch;
+  uint8_t muxsel;
+};
 
 struct ct {
-  enum adc {ADC0, ADC1};
-  enum muxsel {A, B};
-  enum diff {D, SE};
-  
-  adc amps_adc;
-  int amps_adch;   // channel for amps
-  muxsel amps_muxsel;
-  int volts_adch;  // channel for volts
-  muxsel volts_muxsel;
-  diff volts_diff;
+  adcx adc0;
+  adcx adc1;
 } cts[] = {
   // 240v ADC1_DP0 and ADC1_DM0
-  {ADC0,  5, B, 0, A, D},   // ct1  ADC0_SE5b  "A0"
-  {ADC0, 14, A, 0, A, D},   // ct2  ADC0_SE14  "A1"
-  {ADC0,  9, A, 0, A, D},   // ct3  ADC0_SE9   "A3"
-  {ADC0, 13, A, 0, A, D},   // ct4  ADC0_SE13  "A4"
-  {ADC0, 12, A, 0, A, D},   // ct5  ADC0_SE12  "A5"
-  {ADC0,  6, B, 0, A, D},   // ct6  ADC0_SE6b  "A6"
-  {ADC0,  4, B, 0, A, D},   // ct7  ADC0_SE4b  "A9"
-  {ADC0, 17, A, 0, A, D},   // ct8  ADC0_SE17 "A14"
+  {{ 5, 1}, { 0, 0}},  // ct1  ADC0_SE5b  "A0"
+  {{14, 0}, { 0, 0}},  // ct2  ADC0_SE14  "A1"
+  {{ 9, 0}, { 0, 0}},  // ct3  ADC0_SE9   "A3"
+  {{13, 0}, { 0, 0}},  // ct4  ADC0_SE13  "A4"
+  {{12, 0}, { 0, 0}},  // ct5  ADC0_SE12  "A5"
+  {{ 6, 1}, { 0, 0}},  // ct6  ADC0_SE6b  "A6"
+  {{ 4, 1}, { 0, 0}},  // ct7  ADC0_SE4b  "A9"
+  {{17, 0}, { 0, 0}},  // ct8  ADC0_SE17 "A14"
   // 120v L1 ADC0_SE7b
-  {ADC1,  8, A, 7, B, SE},  // ct9  ADC1_SE8   "A2"
-  {ADC1, 14, A, 7, B, SE},  // ct10 ADC1_SE14 "A12"
-  {ADC1, 15, A, 7, B, SE},  // ct11 ADC1_SE15 "A13"
-  {ADC1,  4, B, 7, B, SE},  // ct12 ADC1_SE4b "A16"
+  {{ 7, 1}, { 8, 0}},  // ct9  ADC1_SE8   "A2"
+  {{ 7, 1}, {14, 0}},  // ct10 ADC1_SE14 "A12"
+  {{ 7, 1}, {15, 0}},  // ct11 ADC1_SE15 "A13"
+  {{ 7, 1}, { 4, 1}},  // ct12 ADC1_SE4b "A16"
   // 120v L2 ADC0_SE15
-  {ADC1,  5, B, 15, A, SE}, // ct13 ADC1_SE5b "A17"
-  {ADC1,  6, B, 15, A, SE}, // ct14 ADC1_SE6b "A18"
-  {ADC1,  7, B, 15, A, SE}, // ct15 ADC1_SE7b "A19"
-  {ADC1, 17, A, 15, A, SE}, // ct16 ADC1_SE17 "A20"
+  {{15, 0}, { 5, 1}},  // ct13 ADC1_SE5b "A17"
+  {{15, 0}, { 6, 1}},  // ct14 ADC1_SE6b "A18"
+  {{15, 0}, { 7, 1}},  // ct15 ADC1_SE7b "A19"
+  {{15, 0}, {17, 0}},  // ct16 ADC1_SE17 "A20"
 };
+
+uint8_t current_ct = 0;
 
 char uidStr[17] = {0};  // the lower 2 bytes of the UID
 
@@ -56,7 +50,6 @@ static const char alphabet[] = {
 
 const uint8_t pinLED = 13;
 static const uint8_t PIN_ADC_COCO = 25;
-
 
 // 32767 but ideally divisible by 4 for b85... is that actually necessary?
 // const uint32_t MAX_BUFFER_SIZE = 1600;
@@ -77,9 +70,6 @@ static const uint32_t MAX_ENCODED_BUFFER_SIZE =
   static_cast<int>(MAX_BUFFER_SIZE * 2 * 5 / 4) + 1;
 char encoded_buf[MAX_ENCODED_BUFFER_SIZE];
 // this is teensy 3.5 default in hz
-
-
-
 
 // returns the size of the encoded buffer, not including the terminating null
 uint32_t encode_85(const unsigned char* in, uint32_t len, char* out) {
@@ -102,23 +92,30 @@ uint32_t encode_85(const unsigned char* in, uint32_t len, char* out) {
 }
 
 void restartTimer() {
+  // the new_* values can be set anytime;
+  // pick them up here.
   current_length = new_length;
   set_length(current_length);
   current_frequency = new_frequency;
   set_frequency(current_frequency);
+
+  // the ct can only be set here.
+  current_ct += 1;
+  if (current_ct > 15) current_ct = 0;
+  set_ct(current_ct);
+
   DMA_SERQ = 0;  // enable DMA channel 0
   DMA_SERQ = 1;  // enable DMA channel 1
   // turn the timer back on
   FTM0_SC = (FTM0_SC & ~FTM_SC_CLKS_MASK) | FTM_SC_CLKS(1);
 }
 
-int ct = 0;
 uint32_t encoded_len = 0;
 
 void WriteOutput() {
   Serial.print(uidStr);
   Serial.print("\tct");
-  Serial.print(ct);         // TODO(truher): real ct channels and names
+  Serial.print(current_ct);         // TODO(truher): real ct channels and names
   Serial.print("\t");
   Serial.print(current_frequency);
   Serial.print("\t");
@@ -152,8 +149,7 @@ void maybeRestart() {
   // TODO(truher): reconfigure ADC channels etc
 
   digitalWriteFast(pinLED, LOW);
-  ct += 1;
-  if (ct > 15) ct = 0;
+
   restartTimer();
 }
 
@@ -199,8 +195,6 @@ void set_frequency(uint32_t freq) {
   // the slowest possible is the highest possible mod (65535) of the highest
   // possible prescale (128), of the 60mhz clock, so that's about
   // 7 hz.
-
-  uint32_t desired_mod = (F_BUS / freq);
 
   uint32_t new_mod = (F_BUS / freq);
 
@@ -269,12 +263,23 @@ void calibrate_adc() {
   __enable_irq();
 }
 
-void set_channel() {
-  //          ADC_SC1_DIFF      // differential mode
-  ADC0_SC1A = ADC_SC1_AIEN      // interrupt enable, TODO differential
-            | ADC_SC1_ADCH(5);  // ADC0_SE5b, PTD1, D4, teensy "A0"
+void set_ct(uint8_t ct_value) {
+  ct new_ct = cts[ct_value];
+
+  ADC0_SC1A = ADC_SC1_AIEN
+            | ADC_SC1_ADCH(new_ct.adc0.ch)
+            | ((new_ct.adc1.ch == 0) ? ADC_SC1_DIFF : 0);
   ADC1_SC1A = ADC_SC1_AIEN
-            | ADC_SC1_ADCH(8);  // ADCx_SE8, PTB0, H10, teensy "A2"
+            | ADC_SC1_ADCH(new_ct.adc1.ch);
+
+  // TODO(truher): these are not channel select per se, on the other hand
+  // it's nice for all the CFG2 stuff to be in one place.  hm.
+  //          ADC_CFG2_ADACKEN     // 0 => async clock disabled
+  //          ADC_CFG2_ADHSC       // 0 => normal conversion speed
+  //          ADC_CFG2_ADLSTS(2);  // extra sample time, only with ADLSMP
+
+  ADC0_CFG2 = new_ct.adc0.muxsel ? ADC_CFG2_MUXSEL : 0;
+  ADC1_CFG2 = new_ct.adc1.muxsel ? ADC_CFG2_MUXSEL : 0;
 }
 
 void setup() {
@@ -321,13 +326,7 @@ void setup() {
             | SIM_SOPT7_ADC0TRGSEL(8)  // select FTM0 trigger
             | SIM_SOPT7_ADC1TRGSEL(8);
 
-  set_channel();
-  
-//  //          ADC_SC1_DIFF      // differential mode
-//  ADC0_SC1A = ADC_SC1_AIEN      // interrupt enable, TODO differential
-//            | ADC_SC1_ADCH(5);  // ADC0_SE5b, PTD1, D4, teensy "A0"
-//  ADC1_SC1A = ADC_SC1_AIEN
-//            | ADC_SC1_ADCH(8);  // ADC1_SE8, PTB0, H10, teensy "A2"
+  set_ct(current_ct);
 
   //          ADC_CFG1_ADLPC       // 0 => normal power configuration
   //        | ADC_CFG1_ADLSMP      // 0 = short sample time, 1 = extra time
@@ -337,12 +336,6 @@ void setup() {
   ADC1_CFG1 = ADC_CFG1_ADIV(2)
             | ADC_CFG1_MODE(1)
             | ADC_CFG1_ADICLK(0);
-
-  //          ADC_CFG2_ADACKEN     // 0 => async clock disabled
-  //          ADC_CFG2_ADHSC       // 0 => normal conversion speed
-  //          ADC_CFG2_ADLSTS(2);  // extra sample time, only with ADLSMP
-  ADC0_CFG2 = ADC_CFG2_MUXSEL;      // select "b" channels
-  ADC1_CFG2 = 0;                    // select "a" channels
 
   //         ADC_SC2_REFSEL   // 0 = Vrefh and Vrefl.
   ADC0_SC2 = ADC_SC2_ADTRG    // hardware trigger
@@ -403,21 +396,11 @@ void setup() {
   DMA_TCD1_ATTR |= DMA_TCD_ATTR_DSIZE(DMA_TCD_ATTR_SIZE_16BIT);
 
   set_length(current_length);
-     // major loop size is buffer size (max 32k)
-//  DMA_TCD0_CITER_ELINKNO = current_length;
-//  DMA_TCD1_CITER_ELINKNO = current_length;
-//   // after major loop, go back to the start (bytes!)
-//  DMA_TCD0_DLASTSGA = -2 * current_length;
-//  DMA_TCD1_DLASTSGA = -2 * current_length;
-//  // major loop size is buffer size (max 32k)
-//  DMA_TCD0_BITER_ELINKNO = current_length;
-//  DMA_TCD1_BITER_ELINKNO = current_length;
 
   DMA_TCD0_CSR = DMA_TCD_CSR_DREQ       // disable on completion
                | DMA_TCD_CSR_INTMAJOR;  // interrupt on completion
   DMA_TCD1_CSR = DMA_TCD_CSR_DREQ
                | DMA_TCD_CSR_INTMAJOR;
-
 
   // DMA ENABLE
 
