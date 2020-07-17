@@ -1,3 +1,5 @@
 (sym_lib_table
   (lib (name "teensy")(type "Legacy")(uri "/home/joel/TEENSY/teensy_library/teensy.lib")(options "")(descr ""))
+  (lib (name "SparkFun-Resistors")(type "Legacy")(uri "/home/joel/KICAD/SparkFun-KiCad-Libraries/Libraries/SparkFun-Resistors.lib")(options "")(descr ""))
+  (lib (name "SparkFun-Connectors")(type "Legacy")(uri "/home/joel/KICAD/SparkFun-KiCad-Libraries/Libraries/SparkFun-Connectors.lib")(options "")(descr ""))
 )
