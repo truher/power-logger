@@ -12,21 +12,25 @@ struct ct {
   adcx adc0;
   adcx adc1;
 } cts[] = {
-  // 240v ADC1_DP0 and ADC1_DM0
+  // 240v ADC1_DP0 "A12" and ADC1_DM0 "A11"
   {{ 5, 1}, { 0, 0}},  // ct1  ADC0_SE5b  "A0"
   {{14, 0}, { 0, 0}},  // ct2  ADC0_SE14  "A1"
-  {{ 9, 0}, { 0, 0}},  // ct3  ADC0_SE9   "A3"
-  {{13, 0}, { 0, 0}},  // ct4  ADC0_SE13  "A4"
-  {{12, 0}, { 0, 0}},  // ct5  ADC0_SE12  "A5"
-  {{ 6, 1}, { 0, 0}},  // ct6  ADC0_SE6b  "A6"
-  {{ 4, 1}, { 0, 0}},  // ct7  ADC0_SE4b  "A9"
-  {{17, 0}, { 0, 0}},  // ct8  ADC0_SE17 "A14"
-  // 120v L1 ADC0_SE7b
-  {{ 7, 1}, { 8, 0}},  // ct9  ADC1_SE8   "A2"
+  {{ 8, 0}, { 0, 0}},  // ct3  ADC0_SE17 "A2" no ct3
+  {{ 9, 0}, { 0, 0}},  // ct4  ADC0_SE9   "A3" no ct4
+  {{13, 0}, { 0, 0}},  // ct5  ADC0_SE13  "A4" no ct5
+  {{12, 0}, { 0, 0}},  // ct6  ADC0_SE12  "A5" no ct6
+  {{ 6, 1}, { 0, 0}},  // ct7  ADC0_SE6b  "A6" no ct7
+  {{ 4, 1}, { 0, 0}},  // ct8  ADC0_SE4b  "A9" no ct8
+  // old
+  // {{17, 0}, { 0, 0}},  // ct8  ADC0_SE17 "A14"
+
+  // 120v L1 ADC0_SE7b "A7"
+  // {{ 7, 1}, { 8, 0}},  // ct9  ADC1_SE8   "A2"
+  {{ 7, 1}, { 23, 0}},  // ct9  ADC1_SE23   "A22"
   {{ 7, 1}, {14, 0}},  // ct10 ADC1_SE14 "A12"
   {{ 7, 1}, {15, 0}},  // ct11 ADC1_SE15 "A13"
   {{ 7, 1}, { 4, 1}},  // ct12 ADC1_SE4b "A16"
-  // 120v L2 ADC0_SE15
+  // 120v L2 ADC0_SE15 "A8"
   {{15, 0}, { 5, 1}},  // ct13 ADC1_SE5b "A17"
   {{15, 0}, { 6, 1}},  // ct14 ADC1_SE6b "A18"
   {{15, 0}, { 7, 1}},  // ct15 ADC1_SE7b "A19"
@@ -260,6 +264,9 @@ void setup() {
 
   pinMode(pinLED, OUTPUT);
   pinMode(PIN_ADC_COCO, OUTPUT);
+
+  // i use ADC pins that are also DAC pins, so turn off the DAC
+  DAC1_C0 = 0;
 
   // FTM SETUP
 
