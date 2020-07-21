@@ -1,6 +1,6 @@
 {
   "board": {
-    "active_layer": 34,
+    "active_layer": 31,
     "active_layer_preset": "",
     "hidden_nets": [],
     "high_contrast_mode": 0,
@@ -53,7 +53,7 @@
       33,
       34
     ],
-    "visible_layers": "3ffff_80000001"
+    "visible_layers": "3efff_80000001"
   },
   "meta": {
     "filename": "teensy.kicad_prl",
