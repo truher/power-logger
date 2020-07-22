@@ -71,7 +71,7 @@
         "npth_inside_courtyard": "ignore",
         "padstack": "error",
         "pth_inside_courtyard": "ignore",
-        "track_dangling": "warning",
+        "track_dangling": "error",
         "track_width": "error",
         "tracks_crossing": "error",
         "unconnected_items": "error",
@@ -103,7 +103,8 @@
       },
       "track_widths": [
         0.762,
-        0.508
+        1.27,
+        1.778
       ],
       "via_dimensions": [
         {
