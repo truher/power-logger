@@ -33,7 +33,7 @@ mill-speed=10000
 offset=0.1000
 #offset=20  # Uncomment (and comment the previous line) for voronoi regions
 zwork=-0.0500
-isolation-width=0.04
+isolation-width=0.02
 mill-diameters=0.005
 
 # Drill options
