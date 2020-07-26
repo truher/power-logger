@@ -325,7 +325,7 @@
       "idf": "",
       "netlist": "",
       "specctra_dsn": "",
-      "step": "",
+      "step": "teensy.step",
       "vmrl": ""
     },
     "page_layout_descr_file": ""
