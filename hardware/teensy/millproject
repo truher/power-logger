@@ -27,17 +27,17 @@ zero-start=true
 zsafe=1.0000
 
 # Mill options
-extra-passes=0
-mill-feed=200
+extra-passes=2
+mill-feed=50
 mill-speed=15000
 #offset=0.1000
 #offset=20  # Uncomment (and comment the previous line) for voronoi regions
 zwork=-0.0500
 #isolation-width=0.02
-mill-diameters=0.02
+mill-diameters=0.01
 
 # Drill options
-drill-feed=10
+drill-feed=5
 drill-side=auto
 drill-speed=15000
 #milldrill=false
