@@ -22,7 +22,7 @@ drill=teensy.drl
 #metricoutput=true
 #mirror-absolute=false
 #optimise=true
-zchange=10.0000
+zchange=1.0000
 zero-start=true
 zsafe=1.0000
 

@@ -9,7 +9,7 @@ G91.1     (Incremental arc distance mode.)
 G90       (Absolute coordinates.)
 G00 S15000     (RPM spindle speed.)
 
-G00 Z10.00000 (Retract)
+G00 Z1.00000 (Retract)
 T1
 M5      (Spindle stop.)
 G04 P1.00000
@@ -670,7 +670,7 @@ G0 X-2.51557 Y0.75500
 G1 Z-0.01000
 G1 Z1.00000
 
-G00 Z10.000 ( All done -- retract )
+G00 Z1.000 ( All done -- retract )
 
 M5      (Spindle off.)
 G04 P1.000000
