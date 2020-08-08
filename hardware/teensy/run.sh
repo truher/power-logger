@@ -1,2 +1,2 @@
 pcb2gcode
-sed -i '/^M6/d' back.ngc
+sed -i '/^\(M0\|M6\)/d' back.ngc
