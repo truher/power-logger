@@ -20,11 +20,12 @@ drill=teensy.drl
 # Common options
 metric=false
 metricoutput=false
+nog64=true
 mirror-absolute=true
 optimise=0
 zchange=1.0000
 zero-start=true
-zsafe=1.0000
+zsafe=0.1000
 
 # Mill options
 #extra-passes=2
