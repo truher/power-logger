@@ -23,9 +23,10 @@ metricoutput=false
 nog64=true
 mirror-absolute=true
 optimise=0
-zchange=2.0000
+#zchange=2.000
+zchange=0.050
 zero-start=true
-zsafe=0.0500
+zsafe=0.050
 spinup-time=0
 spindown-time=0
 
@@ -48,7 +49,7 @@ drill-speed=15000
 #milldrill=false
 nog81=true
 onedrill=true
-zdrill=-0.0100
+zdrill=-0.010
 
 # Outline options
 #bridges=0.5000
