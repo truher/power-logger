@@ -23,9 +23,9 @@ metricoutput=false
 nog64=true
 mirror-absolute=true
 optimise=0
-zchange=1.0000
+zchange=2.0000
 zero-start=true
-zsafe=0.1000
+zsafe=0.0500
 spinup-time=0
 spindown-time=0
 
