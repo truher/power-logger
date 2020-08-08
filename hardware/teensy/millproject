@@ -26,11 +26,14 @@ optimise=0
 zchange=1.0000
 zero-start=true
 zsafe=0.1000
+spinup-time=0
+spindown-time=0
 
 # Mill options
 #extra-passes=2
 extra-passes=0
-mill-feed=50
+mill-feed=1000
+mill-vertfeed=100
 mill-speed=15000
 #offset=0.1000
 #offset=20  # Uncomment (and comment the previous line) for voronoi regions

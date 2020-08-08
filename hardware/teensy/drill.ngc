@@ -12,13 +12,13 @@ G00 S15000     (RPM spindle speed.)
 G00 Z1.00000 (Retract)
 T1
 M5      (Spindle stop.)
-G04 P1.00000
+G04 P0.00000
 (MSG, Change tool bit to drill size 0.0315 inch)
 M6      (Tool change.)
 M0      (Temporary machine stop.)
 M3      (Spindle on clockwise.)
 G0 Z0.10000
-G04 P1.00000
+G04 P0.00000
 
 G1 F5.00000
 G0 X-4.60557 Y0.14500
@@ -673,7 +673,7 @@ G1 Z0.10000
 G00 Z1.000 ( All done -- retract )
 
 M5      (Spindle off.)
-G04 P1.000000
+G04 P0.000000
 M9      (Coolant off.)
 M2      (Program end.)
 
