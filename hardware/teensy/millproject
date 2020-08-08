@@ -18,10 +18,10 @@ drill=teensy.drl
 #postamble=postamble.ngc
 
 # Common options
-#metric=true
-#metricoutput=true
-#mirror-absolute=false
-#optimise=true
+metric=false
+metricoutput=false
+mirror-absolute=true
+optimise=0
 zchange=1.0000
 zero-start=true
 zsafe=1.0000
