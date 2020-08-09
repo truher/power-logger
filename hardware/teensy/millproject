@@ -48,7 +48,7 @@ drill-speed=15000
 #milldrill=false
 nog81=true
 onedrill=true
-zdrill=-0.010
+zdrill=-0.100
 
 # Outline options
 #bridges=0.5000
