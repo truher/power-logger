@@ -31,11 +31,10 @@ spinup-time=0
 spindown-time=0
 
 # Mill options
-#extra-passes=2
-extra-passes=0
-mill-feed=1000
+extra-passes=8
+mill-feed=100
 mill-vertfeed=100
-mill-speed=15000
+mill-speed=30000
 #offset=0.1000
 #offset=20  # Uncomment (and comment the previous line) for voronoi regions
 zwork=-0.005
