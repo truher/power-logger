@@ -40,7 +40,7 @@ mill-speed=15000
 #offset=20  # Uncomment (and comment the previous line) for voronoi regions
 zwork=-0.005
 #isolation-width=0.02
-mill-diameters=0.01
+mill-diameters=0.026
 
 # Drill options
 drill-feed=5
