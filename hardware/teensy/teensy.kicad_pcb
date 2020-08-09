@@ -2,7 +2,7 @@
 
   (general
     (thickness 1.6)
-    (drawings 1)
+    (drawings 4)
     (tracks 348)
     (modules 99)
     (nets 86)
@@ -70,7 +70,7 @@
       (plotinvisibletext false)
       (sketchpadsonfab false)
       (subtractmaskfromsilk false)
-      (outputformat 3)
+      (outputformat 1)
       (mirror false)
       (drillshape 0)
       (scaleselection 1)
@@ -3904,7 +3904,10 @@
     )
   )
 
-  (gr_rect (start 38.1 25.4) (end 254 177.8) (layer "Edge.Cuts") (width 0.1) (tstamp de33d35f-6c1a-4c72-ba2d-5c310b40c564))
+  (gr_line (start 254 25.4) (end 254 165.1) (layer "Edge.Cuts") (width 0.1) (tstamp a59fbcdc-2e14-4f7b-a445-a72aedb24cfd))
+  (gr_line (start 38.1 25.4) (end 254 25.4) (layer "Edge.Cuts") (width 0.1) (tstamp f195c32b-bdcb-48ff-8634-3e54f693c4bd))
+  (gr_line (start 38.1 165.1) (end 38.1 25.4) (layer "Edge.Cuts") (width 0.1) (tstamp 19eb86ba-1f86-4942-b2a9-c2792b01ce71))
+  (gr_line (start 254 165.1) (end 38.1 165.1) (layer "Edge.Cuts") (width 0.1) (tstamp 12c3c672-2dec-4f62-a597-232a0399b2dd))
 
   (segment (start 82.86242 53.34) (end 81.28 62.23) (width 1.778) (layer "B.Cu") (net 45) (tstamp bfa34fd1-8be8-47f7-b218-67db481887ce))
   (segment (start 81.28 62.23) (end 81.28 87.602466) (width 1.778) (layer "B.Cu") (net 45) (tstamp 348310c5-5d1f-40b7-b2b8-b1d72334f373))

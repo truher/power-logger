@@ -10,7 +10,7 @@
 #back=board.back.gbr
 back=teensy-B_Cu.gbr
 #outline=board.outline.gbr
-#outline=teensy-Edge_Cuts.gbr
+outline=teensy-Edge_Cuts.gbr
 #drill=board.plated-drill.drl
 drill=teensy.drl
 #preamble=preamble.ngc
@@ -51,16 +51,16 @@ onedrill=true
 zdrill=-0.100
 
 # Outline options
-#bridges=0.5000
-#bridgesnum=2
-#cut-feed=600
-#cut-side=auto
-#cut-infeed=10.0000
-#cut-speed=10000
-#cutter-diameter=3.0000
-#fill-outline=true
-#zbridges=-0.6000
-#zcut=-2.5000
+#bridges=0.500
+#bridgesnum=4
+cut-feed=100
+cut-side=back
+cut-infeed=0.100
+cut-speed=30000
+cutter-diameter=0.026
+fill-outline=true
+zbridges=0.050
+zcut=-0.020
 
 # Autoleveller options
 #al-back=false
