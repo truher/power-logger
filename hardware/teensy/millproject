@@ -51,8 +51,8 @@ onedrill=true
 zdrill=-0.100
 
 # Outline options
-#bridges=0.500
-#bridgesnum=4
+bridges=0.500
+bridgesnum=4
 cut-feed=100
 cut-side=back
 cut-infeed=0.100
