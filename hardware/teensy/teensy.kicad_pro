@@ -54,7 +54,7 @@
       "rule_severities": {
         "clearance": "error",
         "copper_edge_clearance": "error",
-        "courtyards_overlap": "error",
+        "courtyards_overlap": "ignore",
         "drill_too_small": "error",
         "duplicate_footprints": "warning",
         "extra_footprint": "warning",
@@ -302,7 +302,7 @@
   "net_settings": {
     "classes": [
       {
-        "clearance": 0.6604,
+        "clearance": 0.635,
         "diff_pair_gap": 0.762,
         "diff_pair_via_gap": 0.25,
         "diff_pair_width": 0.762,
@@ -355,7 +355,7 @@
   },
   "sheets": [
     [
-      "584c5cbd-a117-4235-a558-fb682e1aed19",
+      "5e4d8fc5-d98a-4442-9340-3f6474a26694",
       ""
     ]
   ],
