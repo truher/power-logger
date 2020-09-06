@@ -32,17 +32,17 @@ spindown-time=0
 tsp-2opt=false
 
 # Mill options
-extra-passes=12
-mill-feed=10
+extra-passes=6
+mill-feed=20
 mill-vertfeed=1
-mill-infeed=0.006
+mill-infeed=0.008
 mill-speed=30000
 mill-feed-direction=climb
 #offset=0.1000
 #offset=20  # Uncomment (and comment the previous line) for voronoi regions
-zwork=-0.003
+zwork=-0.006
 #isolation-width=0.02
-mill-diameters=0.005
+mill-diameters=0.013
 milling-overlap=10%
 
 # Drill options
@@ -57,7 +57,7 @@ zdrill=-0.064
 # Outline options
 bridges=0.200
 bridgesnum=3
-cut-feed=10
+cut-feed=20
 cut-vertfeed=5
 cut-side=back
 cut-infeed=0.032
