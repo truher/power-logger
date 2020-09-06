@@ -29,17 +29,21 @@ zero-start=true
 zsafe=0.050
 spinup-time=0
 spindown-time=0
+tsp-2opt=false
 
 # Mill options
-extra-passes=8
-mill-feed=100
-mill-vertfeed=100
+extra-passes=12
+mill-feed=5
+mill-vertfeed=1
+mill-infeed=0.002
 mill-speed=30000
+mill-feed-direction=climb
 #offset=0.1000
 #offset=20  # Uncomment (and comment the previous line) for voronoi regions
-zwork=-0.005
+zwork=-0.004
 #isolation-width=0.02
-mill-diameters=0.026
+mill-diameters=0.005
+milling-overlap=10%
 
 # Drill options
 drill-feed=5
@@ -48,19 +52,20 @@ drill-speed=15000
 #milldrill=false
 nog81=true
 onedrill=true
-zdrill=-0.100
+zdrill=-0.064
 
 # Outline options
-bridges=0.500
-bridgesnum=4
-cut-feed=100
+bridges=0.200
+bridgesnum=3
+cut-feed=5
+cut-vertfeed=5
 cut-side=back
-cut-infeed=0.100
+cut-infeed=0.032
 cut-speed=30000
-cutter-diameter=0.026
+cutter-diameter=0.058
 fill-outline=true
-zbridges=0.050
-zcut=-0.020
+zbridges=-0.032
+zcut=-0.064
 
 # Autoleveller options
 #al-back=false
