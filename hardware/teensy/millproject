@@ -21,6 +21,7 @@ drill=teensy.drl
 metric=false
 metricoutput=false
 nog64=true
+tolerance=0.001
 mirror-absolute=true
 optimise=0
 # zchange=0.050 # too low for tool changes to actually be possible
@@ -32,9 +33,10 @@ spindown-time=0
 tsp-2opt=false
 
 # Mill options
-extra-passes=3
-# mill-feed=20 # i see high quality at 20, try faster
-mill-feed=25
+extra-passes=5
+# mill-feed=20 # on mdf i see high quality at 20, try faster
+# mill-feed=25 # on copper it seems much too fast, blobs everywhere
+mill-feed=10
 # mill-vertfeed=1 # seems needlessly slow
 mill-vertfeed=5
 mill-infeed=0.008
@@ -42,41 +44,50 @@ mill-speed=30000
 mill-feed-direction=climb
 #offset=0.1000
 #offset=20  # Uncomment (and comment the previous line) for voronoi regions
+offset=0.014 # try to keep the bit out of the traces even though it's narrow?
 # the board is not perfectly flat
 # set the mill *exactly* at the surface.
 # copper is 0.0014 thick.
 # zwork=-0.006 # seems too deep
-zwork=-0.004
-#isolation-width=0.02
-#mill-diameters=0.013 # led to traces 14mil too narrow
+zwork=-0.004 # seems good, board needs to be flatter though
+isolation-width=0.027 # matching kicad
+# this is the actual measured width at 0.004 depth.
+# mill-diameters=0.013 
+# led to traces 14mil too narrow
 # using 0.1mm engraving bit, this is almost 0.7mm which seems like a lot.
 # so 0.013+0.014=0.027 ... but kicad clearance minimum is 25, fixing that.
-mill-diameters=0.027
-milling-overlap=10%
+# 0.006 0.027
+# 0.004 0.0135
+# hm, 
+#mill-diameters=0.027 # this is clearly wrong, leaves space between cuts
+mill-diameters=0.013 # measured at 0.004
+milling-overlap=20% # more, leave the gaps flatter
 
 # Drill options
 # headers are 0.85mm so use 0.9mm drill
+# oops, the holes end up much too big, 042 or 1.1mm, so use 0.7mm drill
 drill-feed=5
 drill-side=auto
-drill-speed=15000
+drill-speed=30000
 #milldrill=false
 nog81=true
 onedrill=true
-zdrill=-0.064
+# zdrill=-0.064 # this didn't go through, actual seems like 0.061
+zdrill=-0.085 # allow for bevel
 
 # Outline options
-bridges=0.200
-bridgesnum=3
+bridges=0.100
+bridgesnum=5 # two extra
 # cut-feed=20 # seemed fast
-cut-feed=10
+cut-feed=5
 cut-vertfeed=5
 cut-side=back
-cut-infeed=0.032
+cut-infeed=0.035
 cut-speed=30000
 cutter-diameter=0.058
 fill-outline=true
-zbridges=-0.032
-zcut=-0.064
+zbridges=-0.035 # leave about 1/32
+zcut=-0.070 # no bevel
 
 # Autoleveller options
 #al-back=false
