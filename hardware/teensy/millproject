@@ -23,8 +23,8 @@ metricoutput=false
 nog64=true
 mirror-absolute=true
 optimise=0
-#zchange=2.000
-zchange=0.050
+# zchange=0.050 # too low for tool changes to actually be possible
+zchange=2.000
 zero-start=true
 zsafe=0.050
 spinup-time=0
@@ -32,20 +32,30 @@ spindown-time=0
 tsp-2opt=false
 
 # Mill options
-extra-passes=6
-mill-feed=20
-mill-vertfeed=1
+extra-passes=3
+# mill-feed=20 # i see high quality at 20, try faster
+mill-feed=25
+# mill-vertfeed=1 # seems needlessly slow
+mill-vertfeed=5
 mill-infeed=0.008
 mill-speed=30000
 mill-feed-direction=climb
 #offset=0.1000
 #offset=20  # Uncomment (and comment the previous line) for voronoi regions
-zwork=-0.006
+# the board is not perfectly flat
+# set the mill *exactly* at the surface.
+# copper is 0.0014 thick.
+# zwork=-0.006 # seems too deep
+zwork=-0.004
 #isolation-width=0.02
-mill-diameters=0.013
+#mill-diameters=0.013 # led to traces 14mil too narrow
+# using 0.1mm engraving bit, this is almost 0.7mm which seems like a lot.
+# so 0.013+0.014=0.027 ... but kicad clearance minimum is 25, fixing that.
+mill-diameters=0.027
 milling-overlap=10%
 
 # Drill options
+# headers are 0.85mm so use 0.9mm drill
 drill-feed=5
 drill-side=auto
 drill-speed=15000
@@ -57,7 +67,8 @@ zdrill=-0.064
 # Outline options
 bridges=0.200
 bridgesnum=3
-cut-feed=20
+# cut-feed=20 # seemed fast
+cut-feed=10
 cut-vertfeed=5
 cut-side=back
 cut-infeed=0.032
