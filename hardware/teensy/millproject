@@ -25,7 +25,8 @@ tolerance=0.001
 mirror-absolute=true
 optimise=0
 # zchange=0.050 # too low for tool changes to actually be possible
-zchange=2.000
+# zchange=2.000 # i don't use this
+zchange=0.100
 zero-start=true
 zsafe=0.050
 spinup-time=0
@@ -33,7 +34,7 @@ spindown-time=0
 tsp-2opt=false
 
 # Mill options
-extra-passes=5
+extra-passes=13 # remove *all* the islands
 # mill-feed=20 # on mdf i see high quality at 20, try faster
 # mill-feed=25 # on copper it seems much too fast, blobs everywhere
 mill-feed=10
@@ -41,15 +42,26 @@ mill-feed=10
 mill-vertfeed=5
 mill-infeed=0.008
 mill-speed=30000
-mill-feed-direction=climb
-#offset=0.1000
-#offset=20  # Uncomment (and comment the previous line) for voronoi regions
-offset=0.014 # try to keep the bit out of the traces even though it's narrow?
+#mill-feed-direction=climb # seems to smear the copper around
+mill-feed-direction=conventional
+# offset=0.100
+# offset=20  # Uncomment (and comment the previous line) for voronoi regions
+#
+# offset=0.014 # try to keep the bit out of the traces even though it's narrow?
+# with 0.014 the 50mil traces were 70 and the 30mil traces were 63.
+# 50 + 28 = 78
+# 30 + 28 = 58
+# hm, it's the 30's i'm worried about being too thin.
+# just try a smaller number
+offset=0.005
+#
 # the board is not perfectly flat
 # set the mill *exactly* at the surface.
 # copper is 0.0014 thick.
 # zwork=-0.006 # seems too deep
-zwork=-0.004 # seems good, board needs to be flatter though
+# zwork=-0.004 # still too deep, maybe i'm setting the zero wrong?
+#                or maybe the board isn't completely flat.
+zwork=-0.003
 isolation-width=0.027 # matching kicad
 # this is the actual measured width at 0.004 depth.
 # mill-diameters=0.013 
@@ -61,7 +73,8 @@ isolation-width=0.027 # matching kicad
 # hm, 
 #mill-diameters=0.027 # this is clearly wrong, leaves space between cuts
 mill-diameters=0.013 # measured at 0.004
-milling-overlap=20% # more, leave the gaps flatter
+#milling-overlap=20% # leaves grooves
+milling-overlap=30%
 
 # Drill options
 # headers are 0.85mm so use 0.9mm drill
@@ -77,7 +90,7 @@ zdrill=-0.085 # allow for bevel
 
 # Outline options
 bridges=0.100
-bridgesnum=5 # two extra
+bridgesnum=5 # weird that this makes four
 # cut-feed=20 # seemed fast
 cut-feed=5
 cut-vertfeed=5

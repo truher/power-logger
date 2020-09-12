@@ -9,7 +9,7 @@ G91.1     (Incremental arc distance mode.)
 G90       (Absolute coordinates.)
 G00 S30000     (RPM spindle speed.)
 
-G00 Z2.00000 (Retract)
+G00 Z0.10000 (Retract)
 T1
 G04 P0.00000
 (MSG, Change tool bit to drill size 0.0315 inch)
@@ -558,7 +558,7 @@ G0 X-3.75997 Y0.45997
 G1 Z-0.08500
 G1 Z0.05000
 
-G00 Z2.000 ( All done -- retract )
+G00 Z0.100 ( All done -- retract )
 
 G04 P0.000000
 M2      (Program end.)
