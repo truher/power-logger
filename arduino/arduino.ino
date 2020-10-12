@@ -260,14 +260,20 @@ void setup() {
   while (!Serial) {
     // do nothing
   }
+  Serial.println("Calibrating...");
   calibrate_adc();
 
+  Serial.println("Setup LED...");
   pinMode(pinLED, OUTPUT);
+  Serial.println("Setup COCO...");
   pinMode(PIN_ADC_COCO, OUTPUT);
 
+  Serial.println("Setup disable DAC...");
   // i use ADC pins that are also DAC pins, so turn off the DAC
-  DAC1_C0 = 0;
+  // TODO: arg, this hangs.  why is that?
+  // DAC1_C0 = 0;
 
+  Serial.println("Setup FTM...");
   // FTM SETUP
 
   FTM1_POL = 0;
@@ -277,6 +283,7 @@ void setup() {
   FTM1_CNTIN = 0;       // counter initial value
   FTM1_C0SC = FTM_CSC_ELSB | FTM_CSC_MSB;  // output compare, high-true
 
+  Serial.println("Setup frequency...");
   set_frequency(current_frequency);
 
   // this is so we can see the clock externally
@@ -298,6 +305,7 @@ void setup() {
             | SIM_SOPT7_ADC0TRGSEL(9)  // select FTM1 trigger
             | SIM_SOPT7_ADC1TRGSEL(9);
 
+  Serial.println("Setup ct...");
   set_ct(current_ct);
 
   //          ADC_CFG1_ADLPC       // 0 => normal power configuration
@@ -367,6 +375,7 @@ void setup() {
   DMA_TCD0_ATTR |= DMA_TCD_ATTR_DSIZE(DMA_TCD_ATTR_SIZE_16BIT);
   DMA_TCD1_ATTR |= DMA_TCD_ATTR_DSIZE(DMA_TCD_ATTR_SIZE_16BIT);
 
+  Serial.println("Setup length...");
   set_length(current_length);
 
   DMA_TCD0_CSR = DMA_TCD_CSR_DREQ       // disable on completion
@@ -375,6 +384,7 @@ void setup() {
                | DMA_TCD_CSR_INTMAJOR;
 
   // DMA ENABLE
+  Serial.println("Enable DMA...");
 
   DMA_SERQ = 0;  // enable DMA channel 0
   DMA_SERQ = 1;  // enable DMA channel 1
@@ -387,6 +397,7 @@ void setup() {
   // ADC interrupt (to see it on the pin)
   NVIC_ENABLE_IRQ(IRQ_ADC0);
   NVIC_ENABLE_IRQ(IRQ_ADC1);
+  Serial.println("Setup complete!");
 }
 
 
