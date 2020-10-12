@@ -92,10 +92,12 @@ def data_writer() -> None:
                     # TODO: timestamp at enqueue rather than dequeue, avoid linger time?
                     old_format_line: bytes = now_b + b' ' + line
 
-                    samples: Optional[lib.VA] = lib.decode_and_interpolate(
+                    samples: Optional[lib.VA] = lib.decode(
                         loadnames, old_format_line)
                     if not samples:
                         continue
+
+                    # print(samples)
 
                     current_config.frequency = samples.frequency
                     current_config.length = samples.length

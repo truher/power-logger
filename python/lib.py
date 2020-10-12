@@ -400,13 +400,8 @@ def scale_samples(samples: VA) -> VA:
     return VA(samples.load, samples.frequency, samples.length, volts, amps)
 
 # date uid ct len b1 b2
-def decode_and_interpolate(loadnames: Dict[bytes, str],
-                           line: bytes) -> Optional[VA]:
-    """Decodes and interpolates sample series.
-
-    Arduino samples voltage and current alternately,
-    so the sample series don't line up.  Interpolate
-    between the samples and trim the ends.
+def decode(loadnames: Dict[bytes, str], line: bytes) -> Optional[VA]:
+    """Decodes sample series.
 
     Args:
         line: raw (encoded) input from arduino

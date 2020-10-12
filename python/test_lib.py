@@ -96,12 +96,12 @@ class TestLib(unittest.TestCase):
         self.assertTrue(
             lib.goodrow([b'date', b'uid', b'ct', b'freq', b'len', b'buff1', b'buff2']))
 
-    def test_decode_and_interpolate(self) -> None:
+    def test_decode(self) -> None:
         """Tests decoding and interpolation together."""
         # interpolation is gone, so this is all there is
         # volts: 10 11 12 13 14
         # amps:  20 21 22 23 24
-        volts_amps = lib.decode_and_interpolate(
+        volts_amps = lib.decode(
             {b'barct1': 'foo'},
             b'0 bar ct1 10 5 3IGcL3;+!P4gd 6aW<f762Cj7yt')
         self.assertIsNotNone(volts_amps)
@@ -132,7 +132,7 @@ class TestLib(unittest.TestCase):
     def test_interpolation_and_power(self) -> None:
         """Tests interpolation and power calculation together."""
         # same as above
-        volts_amps = lib.decode_and_interpolate(
+        volts_amps = lib.decode(
             {b'barct1': 'foo'},
             b'0 bar ct1 10 5 3IGcL3;+!P4gd 6aW<f762Cj7yt')
         self.assertIsNotNone(volts_amps)
