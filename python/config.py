@@ -1,22 +1,22 @@
 """configuration"""
 # FOR TEENSY, uses UID
 loadnames = {
-    b"4E454887900A0030ct0": "load1",
-    b"4E454887900A0030ct1": "load2",
-    b"4E454887900A0030ct2": "load3",
-    b"4E454887900A0030ct3": "load4",
-    b"4E454887900A0030ct4": "load5",
-    b"4E454887900A0030ct5": "load6",
-    b"4E454887900A0030ct6": "load7",
-    b"4E454887900A0030ct7": "load8",
-    b"4E454887900A0030ct8": "load9",
-    b"4E454887900A0030ct9": "load10",
-    b"4E454887900A0030ct10": "load11",
-    b"4E454887900A0030ct11": "load12",
-    b"4E454887900A0030ct12": "load13",
-    b"4E454887900A0030ct13": "load14",
-    b"4E454887900A0030ct14": "load15",
-    b"4E454887900A0030ct15": "load16"
+    b"4E4552361001000Bct0": "load1",
+    b"4E4552361001000Bct1": "load2",
+    b"4E4552361001000Bct2": "load3",
+    b"4E4552361001000Bct3": "load4",
+    b"4E4552361001000Bct4": "load5",
+    b"4E4552361001000Bct5": "load6",
+    b"4E4552361001000Bct6": "load7",
+    b"4E4552361001000Bct7": "load8",
+    b"4E4552361001000Bct8": "load9",
+    b"4E4552361001000Bct9": "load10",
+    b"4E4552361001000Bct10": "load11",
+    b"4E4552361001000Bct11": "load12",
+    b"4E4552361001000Bct12": "load13",
+    b"4E4552361001000Bct13": "load14",
+    b"4E4552361001000Bct14": "load15",
+    b"4E4552361001000Bct15": "load16"
 }
 
 # FOR A PAIR OF LEONARDOS WITH EMONTX SHIELDS
