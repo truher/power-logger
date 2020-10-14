@@ -97,7 +97,7 @@ def data_writer() -> None:
                     if not samples:
                         continue
 
-                    # print(samples)
+                    print(samples)
 
                     current_config.frequency = samples.frequency
                     current_config.length = samples.length

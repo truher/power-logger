@@ -9,11 +9,11 @@ struct adcx {
 };
 
 struct ct {
-  adcx adc0;
-  adcx adc1;
+  adcx adc0;  // volts but note 240v is reversed since adc1
+  adcx adc1;  // amps
 } cts[] = {
   // this is in order on the board
-  // 240v ADC1_DP0 "A12" and ADC1_DM0 "A11"
+  // 240v ADC1_DP0 "A12" and ADC1_DM0 "A11"  ADC1 is volts, differential, always 0
   {{ 4, 1}, { 0, 0}},  // ADC0_SE4b  "A9"
   {{ 6, 1}, { 0, 0}},  // ADC0_SE6b  "A6"
   {{12, 0}, { 0, 0}},  // ADC0_SE12  "A5"
@@ -22,12 +22,12 @@ struct ct {
   {{ 8, 0}, { 0, 0}},  // ADC0_SE17  "A2"
   {{14, 0}, { 0, 0}},  // ADC0_SE14  "A1"
   {{ 5, 1}, { 0, 0}},  // ADC0_SE5b  "A0"
-  // 120v L1 ADC0_SE7b "A7"
+  // 120v L1 ADC0_SE7b "A7"  ADC0 is volts
   {{ 7, 1}, {23, 0}},  // ADC1_SE23  "A22"
   {{ 7, 1}, {17, 0}},  // ADC1_SE17  "A20"
   {{ 7, 1}, { 7, 1}},  // ADC1_SE7b  "A19"
   {{ 7, 1}, { 6, 1}},  // ADC1_SE6b  "A18"
-  // 120v L2 ADC0_SE15 "A8"
+  // 120v L2 ADC0_SE15 "A8"  ADC0 is volts
   {{15, 0}, { 5, 1}},  // ADC1_SE5b  "A17"
   {{15, 0}, { 4, 1}},  // ADC1_SE4b  "A16"
   {{15, 0}, {15, 0}},  // ADC1_SE15  "A13"
@@ -89,6 +89,8 @@ void restartTimer() {
 uint32_t encoded_len = 0;
 
 void WriteOutput() {
+  ct the_ct = cts[current_ct];
+  bool v1 = the_ct.adc1.ch == 0;  // ch0 means volts is adc1 so dma1 so buffer1
   Serial.print(uidStr);
   Serial.print("\tct");
   Serial.print(current_ct);         // TODO(truher): real ct channels and names
@@ -97,12 +99,14 @@ void WriteOutput() {
   Serial.print("\t");
   Serial.print(current_length);
   Serial.print("\t");
+  // flip buffer 0 and buffer 1 so that volts are always first.
+  // TODO: do this more cleanly
   encoded_len =
-    encode_85((const unsigned char *)buffer0, current_length * 2, encoded_buf);
+    encode_85((const unsigned char *)(v1?buffer1:buffer0), current_length * 2, encoded_buf);
   Serial.write(encoded_buf, encoded_len);  // TODO(truher): this is volts
   Serial.print("\t");
   encoded_len =
-    encode_85((const unsigned char *)buffer1, current_length * 2, encoded_buf);
+    encode_85((const unsigned char *)(v1?buffer0:buffer1), current_length * 2, encoded_buf);
   Serial.write(encoded_buf, encoded_len);  // TODO(truher): this is amps
   Serial.println();
   Serial.send_now();
@@ -242,11 +246,12 @@ void calibrate_adc() {
 void set_ct(uint8_t ct_value) {
   ct new_ct = cts[ct_value];
 
-  ADC0_SC1A = ADC_SC1_AIEN
-            | ADC_SC1_ADCH(new_ct.adc0.ch)
-            | ((new_ct.adc1.ch == 0) ? ADC_SC1_DIFF : 0);
-  ADC1_SC1A = ADC_SC1_AIEN
-            | ADC_SC1_ADCH(new_ct.adc1.ch);
+  ADC0_SC1A = ADC_SC1_AIEN                                 // interrupt enable
+            | ADC_SC1_ADCH(new_ct.adc0.ch);                // input channel, never diff
+
+  ADC1_SC1A = ADC_SC1_AIEN                                 // interrupt enable
+            | ADC_SC1_ADCH(new_ct.adc1.ch)                 // input channel
+            | ((new_ct.adc1.ch == 0) ? ADC_SC1_DIFF : 0);  // ch0 is diff
 
   // TODO(truher): these are not channel select per se, on the other hand
   // it's nice for all the CFG2 stuff to be in one place.  hm.
