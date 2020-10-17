@@ -7,4 +7,5 @@
   (lib (name "dk_Diodes-Rectifiers-Arrays")(type "Legacy")(uri "/home/joel/KICAD/digikey-kicad-library/digikey-symbols/dk_Diodes-Rectifiers-Arrays.lib")(options "")(descr ""))
   (lib (name "dk_Diodes-Rectifiers-Single")(type "Legacy")(uri "/home/joel/KICAD/digikey-kicad-library/digikey-symbols/dk_Diodes-Rectifiers-Single.lib")(options "")(descr ""))
   (lib (name "dk_Diodes-Zener-Single")(type "Legacy")(uri "/home/joel/KICAD/digikey-kicad-library/digikey-symbols/dk_Diodes-Zener-Single.lib")(options "")(descr ""))
+  (lib (name "SparkFun-Capacitors")(type "Legacy")(uri "/home/joel/KICAD/SparkFun-KiCad-Libraries/Libraries/SparkFun-Capacitors.lib")(options "")(descr ""))
 )

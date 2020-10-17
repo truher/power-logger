@@ -5,4 +5,5 @@
   (lib (name "digikey-footprints")(type "KiCad")(uri "/home/joel/KICAD/digikey-kicad-library/digikey-footprints.pretty")(options "")(descr ""))
   (lib (name "Potentiometer_THT")(type "KiCad")(uri "/home/joel/KICAD/kicad-footprints/Potentiometer_THT.pretty")(options "")(descr ""))
   (lib (name "Diode_SMD")(type "KiCad")(uri "/home/joel/KICAD/kicad-footprints/Diode_SMD.pretty")(options "")(descr ""))
+  (lib (name "Capacitors")(type "KiCad")(uri "/home/joel/KICAD/SparkFun-KiCad-Libraries/Footprints/Capacitors.pretty")(options "")(descr ""))
 )
