@@ -51,7 +51,7 @@ static const uint8_t PIN_ADC_COCO = 25;
 // 32767 but ideally divisible by 4 for b85... is that actually necessary?
 // const uint32_t MAX_BUFFER_SIZE = 1600;
 // in samples, which is 16b not 8b
-static const uint32_t MAX_BUFFER_SIZE = 1000;
+static const uint32_t MAX_BUFFER_SIZE = 1000;  // TODO: harmonize this with L below
 uint16_t current_length = 1000;
 uint32_t current_frequency = 5000;  // in hz
 uint32_t current_channel = 0;       // zero means "scan all"
@@ -97,16 +97,21 @@ void WriteOutput() {
   Serial.print("\t");
   Serial.print(current_frequency);
   Serial.print("\t");
-  Serial.print(current_length);
+  Serial.print(current_length - 4);
+//  Serial.print(current_length);
   Serial.print("\t");
   // flip buffer 0 and buffer 1 so that volts are always first.
   // TODO: do this more cleanly
   encoded_len =
-    encode_85((const unsigned char *)(v1?buffer1:buffer0), current_length * 2, encoded_buf);
+// fix bad first sample
+//    encode_85((const unsigned char *)(v1?buffer1:buffer0), current_length * 2, encoded_buf);
+    encode_85((const unsigned char *)((v1?buffer1:buffer0) + 4), current_length * 2 - 8, encoded_buf);
   Serial.write(encoded_buf, encoded_len);  // TODO(truher): this is volts
   Serial.print("\t");
   encoded_len =
-    encode_85((const unsigned char *)(v1?buffer0:buffer1), current_length * 2, encoded_buf);
+// fix bad first sample
+//    encode_85((const unsigned char *)(v1?buffer0:buffer1), current_length * 2, encoded_buf);
+    encode_85((const unsigned char *)((v1?buffer0:buffer1) + 4), current_length * 2 - 8, encoded_buf);
   Serial.write(encoded_buf, encoded_len);  // TODO(truher): this is amps
   Serial.println();
   Serial.send_now();
