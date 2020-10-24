@@ -11,6 +11,8 @@ import sys
 import time
 from serial.threaded import Packetizer, ReaderThread #type:ignore
 from scipy import integrate #type:ignore
+from scipy.signal import butter
+from scipy.signal import filtfilt
 import numpy as np
 import pandas as pd
 import serial #type:ignore
@@ -383,11 +385,41 @@ def zero_samples(samples: VA) -> VA:
     Since these are AC coupled measurements, and we look for
     a long time, the zero is just the mean.
     """
-    volts: np.ndarray[np.float64] = ( # pylint: disable=E1136  # pylint/issues/3139
-        samples.volts - np.mean(samples.volts))
+    volts: np.ndarray[np.float64] = (# pylint: disable=E1136  # pylint/issues/3139
+        samples.volts)
     amps: np.ndarray[np.float64] = ( # pylint: disable=E1136  # pylint/issues/3139
-        samples.amps - np.mean(samples.amps))
-    return VA(samples.load, samples.frequency, samples.length, volts, amps)
+        samples.amps)
+
+    # also time-shift to make the resistive load actually resistive.
+    #phase_trim = 1
+    phase_trim = int(samples.length/4500) # this is just by eyeballing it
+    if phase_trim > 0:
+        volts = volts[phase_trim:]
+        amps = amps[:-phase_trim]
+
+    volts = volts - np.mean(volts)
+    amps = amps - np.mean(amps)
+
+    # also filter!
+    #cutoff_freq = 900  # 15f
+    cutoff_freq = 300  # 5f, ok with order 3?
+    #cutoff_freq = 60  # f duh this reduces amplitude by half, by defintion of butterworth
+    #filter_order = 2
+    filter_order = 5
+    b, a = butter(filter_order, 2*cutoff_freq/samples.frequency)
+    # padding to avoid edge effects
+    # TODO: less padding :-)
+    # bah this does not work because mirroring the edge is a crummy extrapolation
+    # TODO: cut off the edges?
+    #amps = filtfilt(b, a, np.concatenate((np.flip(amps),amps,np.flip(amps))))[amps.size:2*amps.size]
+    #volts = filtfilt(b, a, np.concatenate((np.flip(volts),volts,np.flip(volts))))[volts.size:2*volts.size]
+
+#    volts = filtfilt(b, a, volts)
+#    amps = filtfilt(b, a, amps)
+
+    
+    return VA(samples.load, samples.frequency, samples.length-(phase_trim*2), volts, amps)
+    #return VA(samples.load, samples.frequency, samples.length, volts, amps)
 
 def scale_samples(samples: VA) -> VA:
     """Transforms zeroed samples to measures"""

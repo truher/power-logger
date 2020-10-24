@@ -52,12 +52,26 @@ def make_sample_line(now_s: str, samples: lib.VA) -> str:
     """sample data is for debugging"""
     sample_v_mean: float = np.mean(samples.volts)
     sample_v_stdev: float = np.std(samples.volts)
+    sample_v_min: float = np.min(samples.volts)
+    sample_v_max: float = np.max(samples.volts)
+
     sample_a_mean: float = np.mean(samples.amps)
     sample_a_stdev: float = np.std(samples.amps)
+    sample_a_min: float = np.min(samples.amps)
+    sample_a_max: float = np.max(samples.amps)
+
+    sample_v_neg:float = sample_v_mean - sample_v_min
+    sample_v_pos:float = sample_v_max - sample_v_mean
+    sample_a_neg:float = sample_a_mean - sample_a_min
+    sample_a_pos:float = sample_a_max - sample_a_mean
 
     sample_line: str = (f'{now_s}\t{samples.load}'
-                        f'\t{sample_v_mean}\t{sample_v_stdev}'
-                        f'\t{sample_a_mean}\t{sample_a_stdev}')
+                        f'\t{sample_v_mean:.2f}\t{sample_v_stdev:.2f}'
+                        f'\t{sample_v_min:.0f}\t{sample_v_max:.0f}'
+                        f'\t{sample_v_neg:.2f}\t{sample_v_pos:.2f}'
+                        f'\t{sample_a_mean:.2f}\t{sample_a_stdev:.2f}'
+                        f'\t{sample_a_min:.0f}\t{sample_a_max:.0f}'
+                        f'\t{sample_a_pos:.2f}\t{sample_a_pos:.2f}')
     return sample_line
 
 def make_real_old_format_line(now_s: str, volts_amps: lib.VA) -> str:
