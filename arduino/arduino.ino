@@ -1,7 +1,8 @@
 // Copyright 2020 truher
 // Teensy 3.5 two-channel synchronized ADC
-
+#include <stdint.h>
 #include "b85.h"
+#include "median.h"
 
 struct adcx {
   uint8_t ch;
@@ -32,13 +33,13 @@ struct ct {
   {{15, 0}, { 4, 1}},  // ADC1_SE4b  "A16"
   {{15, 0}, {15, 0}},  // ADC1_SE15  "A13"
   {{15, 0}, {14, 0}},  // ADC1_SE14  "A12"
-  
-//  {{ 7, 1}, {14, 0}},  // ADC1_SE14  "A12"
-//  {{ 7, 1}, {15, 0}},  // ADC1_SE15  "A13"
-//  {{ 7, 1}, { 4, 1}},  // ADC1_SE4b  "A16"
-//  {{15, 0}, { 6, 1}},  // ADC1_SE6b  "A18"
-//  {{15, 0}, { 7, 1}},  // ADC1_SE7b  "A19"
-//  {{15, 0}, {17, 0}},  // ADC1_SE17  "A20"
+
+  //  {{ 7, 1}, {14, 0}},  // ADC1_SE14  "A12"
+  //  {{ 7, 1}, {15, 0}},  // ADC1_SE15  "A13"
+  //  {{ 7, 1}, { 4, 1}},  // ADC1_SE4b  "A16"
+  //  {{15, 0}, { 6, 1}},  // ADC1_SE6b  "A18"
+  //  {{15, 0}, { 7, 1}},  // ADC1_SE7b  "A19"
+  //  {{15, 0}, {17, 0}},  // ADC1_SE17  "A20"
 };
 
 uint8_t current_ct = 0;
@@ -59,9 +60,9 @@ uint16_t new_length = 1000;         // for next round
 uint32_t new_frequency = 5000;      // in hz, for next round
 uint32_t new_channel = 0;
 DMAMEM static volatile uint16_t __attribute__((aligned(32)))
-  buffer0[MAX_BUFFER_SIZE];
+buffer0[MAX_BUFFER_SIZE];
 DMAMEM static volatile uint16_t __attribute__((aligned(32)))
-  buffer1[MAX_BUFFER_SIZE];
+buffer1[MAX_BUFFER_SIZE];
 // 2 for sample width, 5/4 for b85, 1 for /0
 static const uint32_t MAX_ENCODED_BUFFER_SIZE =
   static_cast<int>(MAX_BUFFER_SIZE * 2 * 5 / 4) + 1;
@@ -98,20 +99,20 @@ void WriteOutput() {
   Serial.print(current_frequency);
   Serial.print("\t");
   Serial.print(current_length - 4);
-//  Serial.print(current_length);
+  //  Serial.print(current_length);
   Serial.print("\t");
   // flip buffer 0 and buffer 1 so that volts are always first.
   // TODO: do this more cleanly
   encoded_len =
-// fix bad first sample
-//    encode_85((const unsigned char *)(v1?buffer1:buffer0), current_length * 2, encoded_buf);
-    encode_85((const unsigned char *)((v1?buffer1:buffer0) + 4), current_length * 2 - 8, encoded_buf);
+    // fix bad first sample
+    //    encode_85((const unsigned char *)(v1?buffer1:buffer0), current_length * 2, encoded_buf);
+    encode_85((const unsigned char *)((v1 ? buffer1 : buffer0) + 4), current_length * 2 - 8, encoded_buf);
   Serial.write(encoded_buf, encoded_len);  // TODO(truher): this is volts
   Serial.print("\t");
   encoded_len =
-// fix bad first sample
-//    encode_85((const unsigned char *)(v1?buffer0:buffer1), current_length * 2, encoded_buf);
-    encode_85((const unsigned char *)((v1?buffer0:buffer1) + 4), current_length * 2 - 8, encoded_buf);
+    // fix bad first sample
+    //    encode_85((const unsigned char *)(v1?buffer0:buffer1), current_length * 2, encoded_buf);
+    encode_85((const unsigned char *)((v1 ? buffer0 : buffer1) + 4), current_length * 2 - 8, encoded_buf);
   Serial.write(encoded_buf, encoded_len);  // TODO(truher): this is amps
   Serial.println();
   Serial.send_now();
@@ -198,16 +199,16 @@ void set_frequency(uint32_t freq) {
 }
 
 void calibrate_adc() {
-   /*
-  analog_init is called in pins_teensy.c, with some defaults.
-  TODO: calibrate the vref trim
-  VREF_TRM => chop enable (required).  trim level is set to the middle.
-  VREF_SC  => enable vref, regulator, compensation (all required), 'high power mode'
-  ADCx_CFG1 (fixed)
-  ADCx_CFG2 (fixed)
-  ADCx_SC2  (fixed)
-  ADCx_SC3  (fixed)
-  also the calibration is done wrong, so do it over again.
+  /*
+    analog_init is called in pins_teensy.c, with some defaults.
+    TODO: calibrate the vref trim
+    VREF_TRM => chop enable (required).  trim level is set to the middle.
+    VREF_SC  => enable vref, regulator, compensation (all required), 'high power mode'
+    ADCx_CFG1 (fixed)
+    ADCx_CFG2 (fixed)
+    ADCx_SC2  (fixed)
+    ADCx_SC3  (fixed)
+    also the calibration is done wrong, so do it over again.
   */
   __disable_irq();
   ADC0_SC3 = 0;   // stop any current calibration
@@ -252,11 +253,11 @@ void set_ct(uint8_t ct_value) {
   ct new_ct = cts[ct_value];
 
   ADC0_SC1A = ADC_SC1_AIEN                                 // interrupt enable
-            | ADC_SC1_ADCH(new_ct.adc0.ch);                // input channel, never diff
+              | ADC_SC1_ADCH(new_ct.adc0.ch);                // input channel, never diff
 
   ADC1_SC1A = ADC_SC1_AIEN                                 // interrupt enable
-            | ADC_SC1_ADCH(new_ct.adc1.ch)                 // input channel
-            | ((new_ct.adc1.ch == 0) ? ADC_SC1_DIFF : 0);  // ch0 is diff
+              | ADC_SC1_ADCH(new_ct.adc1.ch)                 // input channel
+              | ((new_ct.adc1.ch == 0) ? ADC_SC1_DIFF : 0);  // ch0 is diff
 
   // TODO(truher): these are not channel select per se, on the other hand
   // it's nice for all the CFG2 stuff to be in one place.  hm.
@@ -274,6 +275,11 @@ void setup() {
   while (!Serial) {
     // do nothing
   }
+  Serial.println("median tests (delete me)");
+  int foo[] = {1,2,3,4,5};
+  int bar = median<int>(foo, 5);
+  Serial.println(bar);
+  Serial.println("median tests done (delete me)");
   Serial.println("Calibrating...");
   calibrate_adc();
 
@@ -302,8 +308,8 @@ void setup() {
 
   // this is so we can see the clock externally
   PORTA_PCR12 = PORT_PCR_MUX(3)  // ftm1_ch0 goes to K9 in alternative 3
-               | PORT_PCR_DSE
-               | PORT_PCR_SRE;
+                | PORT_PCR_DSE
+                | PORT_PCR_SRE;
 
   FTM1_EXTTRIG |= FTM_EXTTRIG_INITTRIGEN;  // FTM output trigger enable
   FTM1_MODE |= FTM_MODE_INIT;              // initialize the output
@@ -315,9 +321,9 @@ void setup() {
   // TODO(truher): something about averaging (see SC3)
 
   SIM_SOPT7 = SIM_SOPT7_ADC0ALTTRGEN   // enable alternate trigger
-            | SIM_SOPT7_ADC1ALTTRGEN
-            | SIM_SOPT7_ADC0TRGSEL(9)  // select FTM1 trigger
-            | SIM_SOPT7_ADC1TRGSEL(9);
+              | SIM_SOPT7_ADC1ALTTRGEN
+              | SIM_SOPT7_ADC0TRGSEL(9)  // select FTM1 trigger
+              | SIM_SOPT7_ADC1TRGSEL(9);
 
   Serial.println("Setup ct...");
   set_ct(current_ct);
@@ -325,17 +331,17 @@ void setup() {
   //          ADC_CFG1_ADLPC       // 0 => normal power configuration
   //        | ADC_CFG1_ADLSMP      // 0 = short sample time, 1 = extra time
   ADC0_CFG1 = ADC_CFG1_ADIV(2)     // 2 => divide by 4, so adck = 15mhz
-            | ADC_CFG1_MODE(1)     // 12 bit (13b differential)
-            | ADC_CFG1_ADICLK(0);  // bus clock (60mhz)
+              | ADC_CFG1_MODE(1)     // 12 bit (13b differential)
+              | ADC_CFG1_ADICLK(0);  // bus clock (60mhz)
   ADC1_CFG1 = ADC_CFG1_ADIV(2)
-            | ADC_CFG1_MODE(1)
-            | ADC_CFG1_ADICLK(0);
+              | ADC_CFG1_MODE(1)
+              | ADC_CFG1_ADICLK(0);
 
   //         ADC_SC2_REFSEL   // 0 = Vrefh and Vrefl.
   ADC0_SC2 = ADC_SC2_ADTRG    // hardware trigger
-           | ADC_SC2_DMAEN;   // dma enable
+             | ADC_SC2_DMAEN;   // dma enable
   ADC1_SC2 = ADC_SC2_ADTRG
-           | ADC_SC2_DMAEN;
+             | ADC_SC2_DMAEN;
 
   //         ADC_SC3_CAL      // start calibration
   //         ADC_SC3_ADCO     // continuous conversion
@@ -345,7 +351,7 @@ void setup() {
   ADC1_SC3 = 0;
 
   SIM_SCGC6 |= SIM_SCGC6_FTM1   // ftm1 clock gate
-            |  SIM_SCGC6_ADC0;  // adc0 clock gate
+               |  SIM_SCGC6_ADC0;  // adc0 clock gate
   SIM_SCGC3 |= SIM_SCGC3_ADC1;  // adc1 clock gate
 
   // DMA SETUP
@@ -357,9 +363,9 @@ void setup() {
   // DMA SOURCE SETUP
 
   DMAMUX0_CHCFG0 = DMAMUX_SOURCE_ADC0
-                 | DMAMUX_ENABLE;
+                   | DMAMUX_ENABLE;
   DMAMUX0_CHCFG1 = DMAMUX_SOURCE_ADC1
-                 | DMAMUX_ENABLE;
+                   | DMAMUX_ENABLE;
 
   DMA_TCD0_SADDR = &ADC0_RA;       // DMA channel 0 source ADC0 result A
   DMA_TCD1_SADDR = &ADC1_RA;       // DMA channel 1 source ADC1 result A
@@ -393,9 +399,9 @@ void setup() {
   set_length(current_length);
 
   DMA_TCD0_CSR = DMA_TCD_CSR_DREQ       // disable on completion
-               | DMA_TCD_CSR_INTMAJOR;  // interrupt on completion
+                 | DMA_TCD_CSR_INTMAJOR;  // interrupt on completion
   DMA_TCD1_CSR = DMA_TCD_CSR_DREQ
-               | DMA_TCD_CSR_INTMAJOR;
+                 | DMA_TCD_CSR_INTMAJOR;
 
   // DMA ENABLE
   Serial.println("Enable DMA...");
@@ -435,44 +441,44 @@ void loop() {
       Serial.readBytesUntil('\r', cmd_buffer, sizeof(cmd_buffer) - 1);
     if (bytes_read < 1) return;
     cmd_buffer[bytes_read] = '\0';
-  switch (*cmd_buffer) {
-    case 'C': {
-      Serial.print("found C: ");
-      if (bytes_read < 2) break;
-      int channel = atoi(cmd_buffer + 1);
-      if (channel < 0) break;
-      new_channel = channel;
-      Serial.print("accepted new channel: ");
-      Serial.print(new_channel);
-      Serial.println();
-      break;
-    }
-    case 'F': {
-      Serial.print("found F: ");
-      if (bytes_read < 2) break;
-      int frequency = atoi(cmd_buffer + 1);
-      if (frequency <= 0) break;
-      new_frequency = frequency;
-      Serial.print("accepted new frequency: ");
-      Serial.print(new_frequency);
-      Serial.println();
-      break;
-    }
-    case 'L': {
-      Serial.print("found L: ");
-      if (bytes_read < 2) break;
-      int length = atoi(cmd_buffer + 1);
-      if (length <= 0) break;
-      if (length > 65535) break;
-      new_length = length;
-      Serial.print("accepted new length: ");
-      Serial.print(new_length);
-      Serial.println();
-      break;
-    }
-    default:
-      Serial.print("unrecognized command: ");
-      Serial.println(cmd_buffer);
+    switch (*cmd_buffer) {
+      case 'C': {
+          Serial.print("found C: ");
+          if (bytes_read < 2) break;
+          int channel = atoi(cmd_buffer + 1);
+          if (channel < 0) break;
+          new_channel = channel;
+          Serial.print("accepted new channel: ");
+          Serial.print(new_channel);
+          Serial.println();
+          break;
+        }
+      case 'F': {
+          Serial.print("found F: ");
+          if (bytes_read < 2) break;
+          int frequency = atoi(cmd_buffer + 1);
+          if (frequency <= 0) break;
+          new_frequency = frequency;
+          Serial.print("accepted new frequency: ");
+          Serial.print(new_frequency);
+          Serial.println();
+          break;
+        }
+      case 'L': {
+          Serial.print("found L: ");
+          if (bytes_read < 2) break;
+          int length = atoi(cmd_buffer + 1);
+          if (length <= 0) break;
+          if (length > 65535) break;
+          new_length = length;
+          Serial.print("accepted new length: ");
+          Serial.print(new_length);
+          Serial.println();
+          break;
+        }
+      default:
+        Serial.print("unrecognized command: ");
+        Serial.println(cmd_buffer);
     }
   }
 }
