@@ -276,9 +276,10 @@ void setup() {
     // do nothing
   }
   Serial.println("median tests (delete me)");
-  int foo[] = {1,2,3,4,5};
-  int bar = median<int>(foo, 5);
-  Serial.println(bar);
+  int foo[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+  Serial.println(median<int>(foo, 5));
+  Serial.println(median<int>(foo + 5, 5));
+  Serial.println(median<int>(foo + 10, 5));
   Serial.println("median tests done (delete me)");
   Serial.println("Calibrating...");
   calibrate_adc();
