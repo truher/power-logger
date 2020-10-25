@@ -21,6 +21,8 @@ from config import ACTUAL_RMS_AMPS
 from config import scale_rms_volts
 from config import scale_rms_amps
 
+import cmath
+
 class QueueLine(Packetizer): #type:ignore
     """Handles input within one reader thread."""
     TERMINATOR = b'\n'
@@ -390,18 +392,10 @@ def zero_samples(samples: VA) -> VA:
     amps: np.ndarray[np.float64] = ( # pylint: disable=E1136  # pylint/issues/3139
         samples.amps)
 
-    # also time-shift to make the resistive load actually resistive.
-    #phase_trim = 1
-#    phase_trim = int(samples.length/500) # this is just by eyeballing it
-#    if phase_trim > 0:
-#        volts = volts[phase_trim:]
-#        amps = amps[:-phase_trim]
-# TODO: phase correction
-
     volts = volts - np.mean(volts)
     amps = amps - np.mean(amps)
 
-    # also filter!
+    # low-pass filtering, seems like i don't need this anymore?
     #cutoff_freq = 900  # 15f
     #cutoff_freq = 300  # 5f, ok with order 3?
     #cutoff_freq = 60  # f duh this reduces amplitude by half, by defintion of butterworth
@@ -414,14 +408,14 @@ def zero_samples(samples: VA) -> VA:
     # TODO: cut off the edges?
     #amps = filtfilt(b, a, np.concatenate((np.flip(amps),amps,np.flip(amps))))[amps.size:2*amps.size]
     #volts = filtfilt(b, a, np.concatenate((np.flip(volts),volts,np.flip(volts))))[volts.size:2*volts.size]
+    # volts = filtfilt(b, a, volts)
+    # amps = filtfilt(b, a, amps)
 
-#    volts = filtfilt(b, a, volts)
-#    amps = filtfilt(b, a, amps)
-
+    # phase correction with FFT (eyeballed the difference)
+    amps = np.fft.irfft(np.fft.rfft(amps) * cmath.rect(1., 2 * np.pi / 180))
+    volts = np.fft.irfft(np.fft.rfft(volts) * cmath.rect(1., 7 * np.pi / 180))
     
-    #return VA(samples.load, samples.frequency, samples.length-(phase_trim*2), volts, amps)
     return VA(samples.load, samples.frequency, samples.length, volts, amps)
-    #return VA(samples.load, samples.frequency, samples.length, volts, amps)
 
 def scale_samples(samples: VA) -> VA:
     """Transforms zeroed samples to measures"""
