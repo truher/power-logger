@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include "b85.h"
 #include "median.h"
+#include <numeric>
 
 struct adcx {
   uint8_t ch;
@@ -52,17 +53,40 @@ static const uint8_t PIN_ADC_COCO = 25;
 // 32767 but ideally divisible by 4 for b85... is that actually necessary?
 // const uint32_t MAX_BUFFER_SIZE = 1600;
 // in samples, which is 16b not 8b
-static const uint32_t MAX_BUFFER_SIZE = 1000;  // TODO: harmonize this with L below
-uint16_t current_length = 1000;
-uint32_t current_frequency = 5000;  // in hz
+//static const uint32_t MAX_BUFFER_SIZE = 1000;  // TODO: harmonize this with L below
+//static const uint32_t MAX_BUFFER_SIZE = 10000;  // TODO: harmonize this with L below
+static const uint32_t MAX_BUFFER_SIZE = 20000;  // TODO: harmonize this with L below
+
+// TODO: clean up the actual vs reported sample rate etc, make stride adjustable.
+//uint16_t decimation_stride = 10;
+uint16_t decimation_stride = 20;
+//uint16_t decimation_stride = 5;
+
+
+//uint16_t current_length = 1000;
+//uint16_t current_length = 10000;
+//uint16_t current_length = 10000;
+uint16_t current_length = 20000;
+//uint32_t current_frequency = 5000;  // in hz
+//uint32_t current_frequency = 50000;  // in hz
+uint32_t current_frequency = 100000;  // in hz
+//uint32_t current_frequency = 25000;  // in hz
 uint32_t current_channel = 0;       // zero means "scan all"
-uint16_t new_length = 1000;         // for next round
-uint32_t new_frequency = 5000;      // in hz, for next round
+//uint16_t new_length = 1000;         // for next round
+//uint32_t new_frequency = 5000;      // in hz, for next round
+uint16_t new_length = 20000;         // for next round
+uint32_t new_frequency = 100000;      // in hz, for next round
 uint32_t new_channel = 0;
-DMAMEM static volatile uint16_t __attribute__((aligned(32)))
-buffer0[MAX_BUFFER_SIZE];
-DMAMEM static volatile uint16_t __attribute__((aligned(32)))
-buffer1[MAX_BUFFER_SIZE];
+//DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer0[MAX_BUFFER_SIZE];
+//DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer1[MAX_BUFFER_SIZE];
+//volatile uint16_t buffer0_filtered[MAX_BUFFER_SIZE];
+//volatile uint16_t buffer1_filtered[MAX_BUFFER_SIZE];
+// try signed
+DMAMEM static volatile int16_t __attribute__((aligned(32))) buffer0[MAX_BUFFER_SIZE];
+DMAMEM static volatile int16_t __attribute__((aligned(32))) buffer1[MAX_BUFFER_SIZE];
+volatile int16_t buffer0_filtered[MAX_BUFFER_SIZE];
+volatile int16_t buffer1_filtered[MAX_BUFFER_SIZE];
+
 // 2 for sample width, 5/4 for b85, 1 for /0
 static const uint32_t MAX_ENCODED_BUFFER_SIZE =
   static_cast<int>(MAX_BUFFER_SIZE * 2 * 5 / 4) + 1;
@@ -89,31 +113,46 @@ void restartTimer() {
 
 uint32_t encoded_len = 0;
 
+template <typename T>
+int filter(T* in, int in_len, int stride, T* out) {
+  int out_len = 0;
+  for (int i = 0; i + stride - 1 < in_len; i += stride) {
+    out[out_len] = median<T>(in + i, stride);
+    ++out_len;
+  }
+  return out_len;
+}
+
 void WriteOutput() {
+
+//  int outlen0 = filter<volatile uint16_t>(buffer0, current_length, decimation_stride, buffer0_filtered);
+//  filter<volatile uint16_t>(buffer1, current_length, decimation_stride, buffer1_filtered);
+//  int outlen0 = filter<volatile int16_t>((volatile int16_t*)buffer0, current_length, decimation_stride, (volatile int16_t*)buffer0_filtered);
+//  filter<volatile int16_t>((volatile int16_t*)buffer1, current_length, decimation_stride, (volatile int16_t*)buffer1_filtered);
+// try signed
+  int outlen0 = filter<volatile int16_t>(buffer0, current_length, decimation_stride, buffer0_filtered);
+  filter<volatile int16_t>(buffer1, current_length, decimation_stride, buffer1_filtered);
+  
   ct the_ct = cts[current_ct];
   bool v1 = the_ct.adc1.ch == 0;  // ch0 means volts is adc1 so dma1 so buffer1
   Serial.print(uidStr);
   Serial.print("\tct");
   Serial.print(current_ct);         // TODO(truher): real ct channels and names
   Serial.print("\t");
-  Serial.print(current_frequency);
+  //Serial.print(current_frequency);
+  Serial.print(current_frequency/decimation_stride);
   Serial.print("\t");
-  Serial.print(current_length - 4);
+  Serial.print(outlen0);
   //  Serial.print(current_length);
   Serial.print("\t");
+
   // flip buffer 0 and buffer 1 so that volts are always first.
   // TODO: do this more cleanly
-  encoded_len =
-    // fix bad first sample
-    //    encode_85((const unsigned char *)(v1?buffer1:buffer0), current_length * 2, encoded_buf);
-    encode_85((const unsigned char *)((v1 ? buffer1 : buffer0) + 4), current_length * 2 - 8, encoded_buf);
-  Serial.write(encoded_buf, encoded_len);  // TODO(truher): this is volts
+  encoded_len = encode_85((const unsigned char *)((v1 ? buffer1_filtered : buffer0_filtered)), outlen0 * 2, encoded_buf);
+  Serial.write(encoded_buf, encoded_len);  // this is volts
   Serial.print("\t");
-  encoded_len =
-    // fix bad first sample
-    //    encode_85((const unsigned char *)(v1?buffer0:buffer1), current_length * 2, encoded_buf);
-    encode_85((const unsigned char *)((v1 ? buffer0 : buffer1) + 4), current_length * 2 - 8, encoded_buf);
-  Serial.write(encoded_buf, encoded_len);  // TODO(truher): this is amps
+  encoded_len = encode_85((const unsigned char *)((v1 ? buffer0_filtered : buffer1_filtered)), outlen0 * 2, encoded_buf);
+  Serial.write(encoded_buf, encoded_len);  // this is amps
   Serial.println();
   Serial.send_now();
 }
@@ -145,7 +184,7 @@ void dma_ch0_isr() {
   maybeRestart();
 }
 
-// interrupt on DMA 0 buffer full
+// interrupt on DMA 1 buffer full
 void dma_ch1_isr() {
   DMA_CINT = DMA_CINT_CINT(1);
   maybeRestart();
@@ -153,14 +192,14 @@ void dma_ch1_isr() {
 
 // interrupt on conversion complete
 void adc0_isr() {
-  // int result = ADC0_RA; // TODO REMOVE
-  digitalWriteFast(PIN_ADC_COCO, HIGH);
-  delayMicroseconds(1);
-  digitalWriteFast(PIN_ADC_COCO, LOW);
+//  // int result = ADC0_RA; // TODO REMOVE
+//  digitalWriteFast(PIN_ADC_COCO, HIGH);
+//  delayMicroseconds(1);
+//  digitalWriteFast(PIN_ADC_COCO, LOW);//
 }
 
 void adc1_isr() {
-  // int result = ADC1_RA;  // TODO REMOVE
+//  // int result = ADC1_RA;  // TODO REMOVE/
 }
 
 void set_length(uint16_t len) {
@@ -185,6 +224,9 @@ void set_frequency(uint32_t freq) {
   uint32_t new_mod = (F_BUS / freq);
 
   uint32_t new_half_mod = static_cast<uint32_t> (new_mod / 2);
+// ??? TODO ... this is the wrong frequency? no.
+//  uint32_t new_half_mod = static_cast<uint32_t> (new_mod / 3);
+
   new_mod &= 0xFFFF;
   new_half_mod &= 0xFFFF;
   // modulo, for the counter, output high on overflow
@@ -267,6 +309,9 @@ void set_ct(uint8_t ct_value) {
 
   ADC0_CFG2 = new_ct.adc0.muxsel ? ADC_CFG2_MUXSEL : 0;
   ADC1_CFG2 = new_ct.adc1.muxsel ? ADC_CFG2_MUXSEL : 0;
+//  ADC0_CFG2 = (new_ct.adc0.muxsel ? ADC_CFG2_MUXSEL : 0) | ADC_CFG2_ADHSC;
+//  ADC1_CFG2 = (new_ct.adc1.muxsel ? ADC_CFG2_MUXSEL : 0) | ADC_CFG2_ADHSC;
+
 }
 
 void setup() {
@@ -302,11 +347,15 @@ void setup() {
   FTM1_SC = 0x00;       // reset status == turn off FTM
   FTM1_CNT = 0x00;      // zero the counter, or maybe this does nothing
   FTM1_CNTIN = 0;       // counter initial value
-  FTM1_C0SC = FTM_CSC_ELSB | FTM_CSC_MSB;  // output compare, high-true
+//  FTM1_C0SC = FTM_CSC_ELSB | FTM_CSC_MSB;  // output compare, high-true
+// ??? TODO ???
+  FTM1_C0SC = FTM_CSC_ELSB | FTM_CSC_MSA;  // is the one above wrong?  MSA or MSB?
+
 
   Serial.println("Setup frequency...");
   set_frequency(current_frequency);
-
+//
+// turn this off to see if it causes the noise?  nope.
   // this is so we can see the clock externally
   PORTA_PCR12 = PORT_PCR_MUX(3)  // ftm1_ch0 goes to K9 in alternative 3
                 | PORT_PCR_DSE
@@ -332,11 +381,25 @@ void setup() {
   //          ADC_CFG1_ADLPC       // 0 => normal power configuration
   //        | ADC_CFG1_ADLSMP      // 0 = short sample time, 1 = extra time
   ADC0_CFG1 = ADC_CFG1_ADIV(2)     // 2 => divide by 4, so adck = 15mhz
+// something about the clock?
+//  ADC0_CFG1 = ADC_CFG1_ADIV(3)
+// try more time?
+              | ADC_CFG1_ADLSMP
               | ADC_CFG1_MODE(1)     // 12 bit (13b differential)
               | ADC_CFG1_ADICLK(0);  // bus clock (60mhz)
+// try bus clock divided by 2
+//              | ADC_CFG1_ADICLK(1);
+
   ADC1_CFG1 = ADC_CFG1_ADIV(2)
+// something about the clock?
+//  ADC1_CFG1 = ADC_CFG1_ADIV(3)
+// try more time?
+              | ADC_CFG1_ADLSMP
               | ADC_CFG1_MODE(1)
               | ADC_CFG1_ADICLK(0);
+// try bus clock divided by 2
+//              | ADC_CFG1_ADICLK(1);
+
 
   //         ADC_SC2_REFSEL   // 0 = Vrefh and Vrefl.
   ADC0_SC2 = ADC_SC2_ADTRG    // hardware trigger
@@ -350,6 +413,11 @@ void setup() {
   //         ADC_SC3_AVGS(0)  // 0 => 4 samples
   ADC0_SC3 = 0;  // one-shot, no averaging
   ADC1_SC3 = 0;
+//  // try averaging?  this creates more noise, and a different (nonsensical) average (!)
+//  ADC0_SC3 = ADC_SC3_AVGE
+//             | ADC_SC3_AVGS(0);  
+//  ADC1_SC3 = ADC_SC3_AVGE
+//             | ADC_SC3_AVGS(0);  
 
   SIM_SCGC6 |= SIM_SCGC6_FTM1   // ftm1 clock gate
                |  SIM_SCGC6_ADC0;  // adc0 clock gate
