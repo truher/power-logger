@@ -27,6 +27,7 @@ d3.select(container).on('draw', () => {
         update => {
           update.each(function(d, i, g) {
             //const line = fc.seriesWebglLine()
+            //const line = fc.seriesSvgPoint()
             const line = fc.seriesSvgLine()
               .crossValue((d, i) => i)
               .mainValue(d => d);

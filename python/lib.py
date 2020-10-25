@@ -392,21 +392,22 @@ def zero_samples(samples: VA) -> VA:
 
     # also time-shift to make the resistive load actually resistive.
     #phase_trim = 1
-    phase_trim = int(samples.length/4500) # this is just by eyeballing it
-    if phase_trim > 0:
-        volts = volts[phase_trim:]
-        amps = amps[:-phase_trim]
+#    phase_trim = int(samples.length/500) # this is just by eyeballing it
+#    if phase_trim > 0:
+#        volts = volts[phase_trim:]
+#        amps = amps[:-phase_trim]
+# TODO: phase correction
 
     volts = volts - np.mean(volts)
     amps = amps - np.mean(amps)
 
     # also filter!
     #cutoff_freq = 900  # 15f
-    cutoff_freq = 300  # 5f, ok with order 3?
+    #cutoff_freq = 300  # 5f, ok with order 3?
     #cutoff_freq = 60  # f duh this reduces amplitude by half, by defintion of butterworth
     #filter_order = 2
-    filter_order = 5
-    b, a = butter(filter_order, 2*cutoff_freq/samples.frequency)
+    #filter_order = 5
+    #b, a = butter(filter_order, 2*cutoff_freq/samples.frequency)
     # padding to avoid edge effects
     # TODO: less padding :-)
     # bah this does not work because mirroring the edge is a crummy extrapolation
@@ -418,7 +419,8 @@ def zero_samples(samples: VA) -> VA:
 #    amps = filtfilt(b, a, amps)
 
     
-    return VA(samples.load, samples.frequency, samples.length-(phase_trim*2), volts, amps)
+    #return VA(samples.load, samples.frequency, samples.length-(phase_trim*2), volts, amps)
+    return VA(samples.load, samples.frequency, samples.length, volts, amps)
     #return VA(samples.load, samples.frequency, samples.length, volts, amps)
 
 def scale_samples(samples: VA) -> VA:
