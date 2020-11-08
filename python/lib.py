@@ -396,6 +396,7 @@ def zero_samples(samples: VA) -> VA:
     amps = amps - np.mean(amps)
 
     # low-pass filtering, seems like i don't need this anymore?
+    #cutoff_freq = 300  # 15f
     #cutoff_freq = 900  # 15f
     #cutoff_freq = 300  # 5f, ok with order 3?
     #cutoff_freq = 60  # f duh this reduces amplitude by half, by defintion of butterworth
@@ -408,8 +409,8 @@ def zero_samples(samples: VA) -> VA:
     # TODO: cut off the edges?
     #amps = filtfilt(b, a, np.concatenate((np.flip(amps),amps,np.flip(amps))))[amps.size:2*amps.size]
     #volts = filtfilt(b, a, np.concatenate((np.flip(volts),volts,np.flip(volts))))[volts.size:2*volts.size]
-    # volts = filtfilt(b, a, volts)
-    # amps = filtfilt(b, a, amps)
+    #volts = filtfilt(b, a, volts)
+    #amps = filtfilt(b, a, amps)
 
     # phase correction with FFT (eyeballed the difference)
     amps = np.fft.irfft(np.fft.rfft(amps) * cmath.rect(1., 2 * np.pi / 180))

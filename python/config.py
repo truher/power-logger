@@ -50,23 +50,45 @@ loadnames = {
 # sample period of about a minute
 
 # Vrms, according to Fluke
-ACTUAL_RMS_VOLTS = 120.3
+ACTUAL_RMS_VOLTS = 117.2
 # Arms, according to Extech
-ACTUAL_RMS_AMPS = 2.05
+ACTUAL_RMS_AMPS = 2.02
 
-# mean Vrms from data_sample.csv
+# mean Vrms (stdev) from data_sample.csv
 # TODO: make these right
-#sample_rms_volts = [171.645, 171.720, 171.648, 171.727, 172.793, 172.964, 172.780, 172.953]
-sample_rms_volts = [-171.645, -171.720, -171.648, -171.727,
-                    -172.793, -172.964, -172.780, -172.953,
-                    171.645, 171.720, 171.648, 171.727,
-                    -172.793, -172.964, -170.000, -170.000]
+sample_rms_volts = [-2398.757,
+                    -2398.734,
+                    -2398.684,
+                    -2398.664,
+                    -2398.642,
+                    -2398.498,
+                    -2398.670,
+                    -2398.895,
+                     1200.740,
+                     1200.560,
+                     1200.634,
+                     1200.660,
+                    -1196.481,
+                    -1196.482,
+                    -1196.533,
+                    -1196.506]
 # mean Arms from data_sample.csv
-#sample_rms_amps = [6.985, 6.799, 6.763, 6.817, 6.786, 6.898, 6.794, 6.785]
-sample_rms_amps = [6.985, 6.799, 6.763, 6.817,
-                   6.786, 6.898, 6.794, 6.785,
-                   6.985, 6.799, 6.763, 6.817,
-                   6.786, 6.898, 6.123, 6.123]
+sample_rms_amps = [39.859,
+                   38.326,
+                   41.334,
+                   39.611,
+                   49.721,
+                   42.410,
+                   40.880,
+                   40.218,
+                   106.423,
+                   106.009,
+                   108.173,
+                   107.205,
+                   110.624,
+                   109.435,
+                   108.456,
+                   108.627]
 
 scale_rms_volts = dict(zip(loadnames.values(), sample_rms_volts))
 scale_rms_amps = dict(zip(loadnames.values(), sample_rms_amps))

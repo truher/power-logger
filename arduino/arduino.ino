@@ -58,24 +58,23 @@ static const uint8_t PIN_ADC_COCO = 25;
 static const uint32_t MAX_BUFFER_SIZE = 20000;  // TODO: harmonize this with L below
 
 // TODO: clean up the actual vs reported sample rate etc, make stride adjustable.
-//uint16_t decimation_stride = 10;
-uint16_t decimation_stride = 20;
+uint16_t decimation_stride = 10;
+//uint16_t decimation_stride = 20;
 //uint16_t decimation_stride = 5;
 
 
 //uint16_t current_length = 1000;
-//uint16_t current_length = 10000;
-//uint16_t current_length = 10000;
-uint16_t current_length = 20000;
+uint16_t current_length = 10000;
+//uint16_t current_length = 20000;
 //uint32_t current_frequency = 5000;  // in hz
-//uint32_t current_frequency = 50000;  // in hz
-uint32_t current_frequency = 100000;  // in hz
+uint32_t current_frequency = 50000;  // in hz
+//uint32_t current_frequency = 100000;  // in hz
 //uint32_t current_frequency = 25000;  // in hz
 uint32_t current_channel = 0;       // zero means "scan all"
 //uint16_t new_length = 1000;         // for next round
 //uint32_t new_frequency = 5000;      // in hz, for next round
-uint16_t new_length = 20000;         // for next round
-uint32_t new_frequency = 100000;      // in hz, for next round
+uint16_t new_length = 10000;         // for next round
+uint32_t new_frequency = 50000;      // in hz, for next round
 uint32_t new_channel = 0;
 //DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer0[MAX_BUFFER_SIZE];
 //DMAMEM static volatile uint16_t __attribute__((aligned(32))) buffer1[MAX_BUFFER_SIZE];
